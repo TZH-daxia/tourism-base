@@ -247,6 +247,7 @@ onBeforeUnmount(() => {
   position: relative;
   width: 100%;
   height: 100%;
+  min-height: 100%;
   overflow: hidden;
   color: #151515;
   background:
@@ -316,17 +317,30 @@ onBeforeUnmount(() => {
 .portal-stage {
   width: 100%;
   height: 100%;
+  min-height: 100%;
+  display: grid;
+  place-items: center;
+  padding: 112px 28px 56px;
+  overflow: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.portal-stage::-webkit-scrollbar {
+  display: none;
 }
 
 .portal-center {
-  position: absolute;
-  top: 48%;
-  left: 50%;
-  width: min(780px, calc(100vw - 40px));
-  transform: translate(-50%, -50%);
+  position: relative;
+  width: min(780px, 100%);
+  max-width: 100%;
+  max-height: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
+  gap: 0;
+  text-align: center;
 }
 
 .brand-stack {
@@ -346,7 +360,7 @@ onBeforeUnmount(() => {
 
 .brand-title {
   color: rgba(21, 21, 21, 0.58);
-  font-size: 11px;
+  font-size: clamp(10px, 1.3vw, 11px);
   font-weight: 700;
   letter-spacing: 0.28em;
   text-transform: uppercase;
@@ -358,10 +372,10 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 10px;
   font-family: 'DM Sans', sans-serif;
-  font-size: clamp(56px, 9vw, 108px);
+  font-size: clamp(42px, 7vw, 96px);
   font-weight: 800;
-  line-height: 1;
-  letter-spacing: -0.06em;
+  line-height: 0.96;
+  letter-spacing: -0.05em;
   color: #111111;
   text-transform: uppercase;
   text-shadow: 0 14px 28px rgba(225, 231, 235, 0.75);
@@ -369,7 +383,7 @@ onBeforeUnmount(() => {
 }
 
 .search-wrap {
-  margin-top: 20px;
+  margin-top: 18px;
   width: min(700px, 100%);
 }
 
@@ -401,7 +415,8 @@ onBeforeUnmount(() => {
 .search-copy {
   text-align: left;
   color: rgba(21, 21, 21, 0.72);
-  font-size: 15px;
+  font-size: clamp(13px, 1.8vw, 15px);
+  line-height: 1.5;
 }
 
 .search-login {
@@ -415,16 +430,20 @@ onBeforeUnmount(() => {
 .search-actions {
   display: flex;
   justify-content: center;
+  flex-wrap: wrap;
   gap: 14px;
   margin-top: 18px;
 }
 
 .status-row {
   display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
   gap: 18px;
-  margin-top: 34px;
+  margin-top: 28px;
   color: rgba(21, 21, 21, 0.46);
   font-size: 12px;
+  text-align: center;
 }
 
 .orbit-note {
@@ -538,11 +557,11 @@ onBeforeUnmount(() => {
   }
 
   .portal-center {
-    width: calc(100vw - 28px);
+    width: min(100%, 720px);
   }
 
   .travel-logo {
-    font-size: clamp(42px, 9vw, 72px);
+    font-size: clamp(34px, 8vw, 64px);
   }
 
   .search-shell {
@@ -562,6 +581,136 @@ onBeforeUnmount(() => {
     gap: 10px;
   }
 
+  .orbit-note,
+  .portal-hint {
+    display: none;
+  }
+}
+
+@media (max-width: 720px) {
+  .portal-stage {
+    padding: 92px 16px 32px;
+  }
+
+  .masthead {
+    top: 14px;
+  }
+
+  .masthead-left {
+    left: 12px;
+    right: 12px;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .brand-icon {
+    width: 36px;
+    height: 54px;
+  }
+
+  .brand-title {
+    letter-spacing: 0.2em;
+  }
+
+  .travel-logo {
+    white-space: normal;
+    text-wrap: balance;
+  }
+
+  .search-wrap {
+    margin-top: 14px;
+  }
+
+  .search-shell {
+    gap: 10px;
+    border-radius: 28px;
+  }
+
+  .search-actions {
+    gap: 10px;
+    margin-top: 14px;
+  }
+
+  .status-row {
+    margin-top: 18px;
+    gap: 8px;
+    font-size: 11px;
+  }
+}
+
+@media (max-height: 860px) {
+  .portal-stage {
+    padding-top: 84px;
+    padding-bottom: 28px;
+  }
+
+  .brand-icon {
+    width: 38px;
+    height: 56px;
+  }
+
+  .travel-logo {
+    margin-top: 10px;
+    font-size: clamp(38px, 6.2vw, 76px);
+  }
+
+  .search-wrap {
+    margin-top: 14px;
+  }
+
+  .search-actions {
+    margin-top: 14px;
+  }
+
+  .status-row {
+    margin-top: 20px;
+  }
+
+  .hint-top {
+    top: 88px;
+  }
+
+  .hint-bottom {
+    bottom: 18px;
+  }
+}
+
+@media (max-height: 740px) {
+  .portal-stage {
+    padding-top: 72px;
+  }
+
+  .masthead {
+    top: 14px;
+  }
+
+  .brand-stack {
+    gap: 8px;
+  }
+
+  .brand-icon {
+    width: 34px;
+    height: 50px;
+  }
+
+  .brand-title {
+    font-size: 10px;
+    letter-spacing: 0.16em;
+  }
+
+  .travel-logo {
+    font-size: clamp(32px, 5.6vw, 60px);
+  }
+
+  .search-shell {
+    min-height: 54px;
+  }
+
+  .search-login {
+    padding: 7px 14px;
+  }
+
+  .status-row,
   .orbit-note,
   .portal-hint {
     display: none;

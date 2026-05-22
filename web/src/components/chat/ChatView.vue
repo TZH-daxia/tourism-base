@@ -600,7 +600,7 @@ onBeforeUnmount(() => {
   z-index: 1;
   inset: 18px 18px 0;
   display: grid;
-  grid-template-columns: 300px minmax(0, 1fr);
+  grid-template-columns: minmax(268px, 300px) minmax(0, 1fr);
   align-items: stretch;
   gap: 18px;
 }
@@ -620,6 +620,7 @@ onBeforeUnmount(() => {
 .sidebar {
   display: flex;
   flex-direction: column;
+  min-width: 0;
   padding: 18px;
   gap: 18px;
 }
@@ -672,6 +673,7 @@ onBeforeUnmount(() => {
   margin-right: -18px;
   padding-right: 18px;
   scrollbar-gutter: stable;
+  overscroll-behavior: contain;
 }
 
 .settings-dock {
@@ -985,6 +987,7 @@ onBeforeUnmount(() => {
 .chat-main {
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr) auto;
+  min-height: 0;
   min-width: 0;
   padding: 18px;
   gap: 14px;
@@ -993,8 +996,9 @@ onBeforeUnmount(() => {
 .hero {
   display: flex;
   justify-content: space-between;
+  align-items: stretch;
   gap: 20px;
-  min-height: 168px;
+  min-height: clamp(148px, 22vh, 168px);
   padding: 20px 22px;
   border-radius: 24px;
   background:
@@ -1002,6 +1006,11 @@ onBeforeUnmount(() => {
     radial-gradient(circle at right, rgba(14, 124, 134, 0.08), transparent 38%);
   border: 1px solid rgba(128, 92, 53, 0.1);
   transition: box-shadow 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+}
+
+.hero-copy {
+  min-width: 0;
+  flex: 1 1 auto;
 }
 
 .hero.condensed {
@@ -1019,7 +1028,7 @@ onBeforeUnmount(() => {
 .hero h1 {
   margin: 10px 0 12px;
   font-family: 'Cormorant Garamond', serif;
-  font-size: 46px;
+  font-size: clamp(34px, 3.4vw, 46px);
   line-height: 0.98;
   color: #2b2318;
 }
@@ -1033,20 +1042,22 @@ onBeforeUnmount(() => {
   margin: 0;
   color: var(--text-secondary);
   line-height: 1.75;
+  text-wrap: pretty;
 }
 
 .hero-actions {
   display: flex;
   align-items: stretch;
   justify-content: center;
-  flex: 0 0 360px;
-  width: 360px;
-  min-width: 360px;
+  flex: 0 1 360px;
+  width: min(360px, 100%);
+  min-width: 320px;
 }
 
 .toggle-card {
   width: 100%;
-  height: 154px;
+  height: 100%;
+  min-height: 154px;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -1258,7 +1269,8 @@ onBeforeUnmount(() => {
   min-height: 0;
   overflow: auto;
   scrollbar-gutter: stable both-edges;
-  padding: 24px 28px 136px;
+  overscroll-behavior: contain;
+  padding: 24px clamp(18px, 2.3vw, 28px) 136px;
 }
 
 .message {
@@ -1569,6 +1581,7 @@ onBeforeUnmount(() => {
 }
 
 .composer-row input {
+  min-width: 0;
   height: 56px;
   padding: 0 18px;
   border-radius: 18px;
@@ -1778,6 +1791,128 @@ onBeforeUnmount(() => {
 
   .settings-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 1320px) {
+  .chat-shell {
+    gap: 14px;
+  }
+
+  .hero {
+    flex-wrap: wrap;
+  }
+
+  .hero-actions {
+    flex: 1 1 100%;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .toggle-card {
+    min-height: 138px;
+  }
+}
+
+@media (max-height: 860px) {
+  .chat-shell {
+    inset: 12px 12px 0;
+    gap: 12px;
+  }
+
+  .sidebar,
+  .chat-main {
+    border-radius: 22px;
+  }
+
+  .sidebar {
+    padding: 14px;
+    gap: 14px;
+  }
+
+  .brand-card {
+    padding: 16px;
+  }
+
+  .brand-title {
+    font-size: 32px;
+  }
+
+  .new-chat-btn {
+    padding: 12px 16px;
+  }
+
+  .chat-main {
+    padding: 14px;
+    gap: 12px;
+  }
+
+  .hero {
+    min-height: 144px;
+    padding: 18px;
+  }
+
+  .recommend-strip {
+    min-height: 92px;
+    max-height: 102px;
+    padding: 12px 14px;
+  }
+
+  .messages {
+    padding-bottom: 118px;
+  }
+
+  .composer {
+    padding: 14px 16px 8px;
+  }
+}
+
+@media (max-height: 740px) {
+  .sidebar {
+    gap: 12px;
+  }
+
+  .brand-card {
+    padding: 14px;
+  }
+
+  .brand-title {
+    font-size: 28px;
+  }
+
+  .brand-desc,
+  .hero p,
+  .composer-top {
+    display: none;
+  }
+
+  .hero {
+    min-height: 0;
+    padding: 16px;
+  }
+
+  .hero h1,
+  .hero.condensed h1 {
+    margin-bottom: 0;
+    font-size: clamp(28px, 3vw, 34px);
+  }
+
+  .recommend-strip {
+    min-height: 82px;
+    max-height: 90px;
+  }
+
+  .recommend-row {
+    margin-top: 8px;
+  }
+
+  .messages {
+    padding-top: 18px;
+    padding-bottom: 108px;
+  }
+
+  .composer-row input {
+    height: 50px;
   }
 }
 
