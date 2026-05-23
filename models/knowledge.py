@@ -43,6 +43,7 @@ class RuntimeModelSettings(BaseModel):
     api_key: str = ""
     base_url: str = ""
     model: str = ""
+    is_default: bool = True
     vision_required: bool = True
     warning: str = "请优先使用支持视觉的模型，否则文档里的图片信息可能无法被正确理解。"
 
@@ -51,6 +52,11 @@ class RuntimeModelSettingsUpdate(BaseModel):
     api_key: str
     base_url: str
     model: str
+
+
+class RuntimeModelSettingsTestResponse(BaseModel):
+    ok: bool = False
+    message: str = ""
 
 
 class RAGChatRequest(BaseModel):
@@ -66,3 +72,15 @@ class RAGChatResponse(BaseModel):
     citations: List[dict] = Field(default_factory=list)
     images: List[dict] = Field(default_factory=list)
     timestamp: datetime = Field(default_factory=datetime.now)
+
+
+class ChatSessionSummary(BaseModel):
+    session_id: str
+    title: str = ""
+    updated_at: datetime = Field(default_factory=datetime.now)
+    created_at: datetime = Field(default_factory=datetime.now)
+    message_count: int = 0
+
+
+class ChatSessionRenameRequest(BaseModel):
+    title: str = ""

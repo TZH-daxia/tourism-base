@@ -1,14 +1,19 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { nextTick, onMounted, ref } from 'vue'
 
 const emit = defineEmits<{ close: []; login: [] }>()
 
 const account = ref('')
 const password = ref('')
+const accountInput = ref<HTMLInputElement>()
 
 function handleLogin() {
   emit('login')
 }
+
+onMounted(() => {
+  nextTick(() => accountInput.value?.focus())
+})
 </script>
 
 <template>
@@ -16,23 +21,23 @@ function handleLogin() {
     <Transition name="fade">
       <div class="login-overlay" @click.self="emit('close')">
         <div class="login-card">
-          <div class="login-eyebrow">Demo Login</div>
+          <div class="login-eyebrow">Account Access</div>
           <h3>进入游侠智库</h3>
-          <p>这里先保留一个登录演示入口。当前不校验账号信息，不论输入什么内容，点击登录都会直接进入系统。</p>
+          <p>登录后即可进入游侠智库，继续使用旅游知识检索、会话管理与知识库后台功能。</p>
 
           <label class="login-field">
             <span>账号</span>
-            <input v-model="account" type="text" placeholder="输入任意账号名" />
+            <input ref="accountInput" v-model="account" type="text" placeholder="请输入账号" />
           </label>
 
           <label class="login-field">
             <span>密码</span>
-            <input v-model="password" type="password" placeholder="输入任意密码" />
+            <input v-model="password" type="password" placeholder="请输入密码" />
           </label>
 
           <div class="login-actions">
             <button class="login-btn ghost" type="button" @click="emit('close')">取消</button>
-            <button class="login-btn solid" type="button" @click="handleLogin">登录并进入</button>
+            <button class="login-btn solid" type="button" @click="handleLogin">登录</button>
           </div>
         </div>
       </div>

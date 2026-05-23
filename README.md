@@ -162,7 +162,7 @@ tourism_base/
 
 | 字段 | 类型 | 说明 |
 |---|---|---|
-| `session_id` | `string` | 会话主键 |
+| `session_id` | `string` | 会话主键，服务端按 `"1"`、`"2"`、`"3"` 递增生成 |
 | `title` | `string` | 会话标题 |
 | `messages` | `array` | 全部消息 |
 | `created_at` | `datetime` | 创建时间 |
@@ -413,7 +413,7 @@ npm run build
 ```json
 {
   "message": "三亚有什么好玩的？",
-  "session_id": "session_xxx",
+  "session_id": "12",
   "rag_enabled": true
 }
 ```
@@ -422,7 +422,7 @@ npm run build
 
 | 字段 | 类型 | 说明 |
 |---|---|---|
-| `session_id` | `string` | 会话 id |
+| `session_id` | `string` | 会话 id，未传时由服务端按递增编号生成 |
 | `message` | `string` | 回复文本 |
 | `sources` | `array` | 命中的来源列表 |
 | `citations` | `array` | 引用列表 |
@@ -446,9 +446,9 @@ npm run build
 典型 SSE 数据格式：
 
 ```text
-data: {"token":"三亚","session_id":"xxx"}
-data: {"token":"有很多值得去的地方","session_id":"xxx"}
-data: {"done":true,"session_id":"xxx","sources":[...],"images":[...],"rag_referenced":true}
+data: {"token":"三亚","session_id":"12"}
+data: {"token":"有很多值得去的地方","session_id":"12"}
+data: {"done":true,"session_id":"12","sources":[...],"images":[...],"rag_referenced":true}
 ```
 
 ### 7. 历史会话接口
@@ -459,7 +459,7 @@ data: {"done":true,"session_id":"xxx","sources":[...],"images":[...],"rag_refere
 
 ```json
 {
-  "session_id": "session_xxx",
+  "session_id": "12",
   "messages": [
     {
       "role": "user",
@@ -576,7 +576,7 @@ OPENAI_API_BASE=https://api.siliconflow.cn/v1
 LLM_DEFAULT_MODEL=Pro/moonshotai/Kimi-K2.5
 
 MONGO_URL=mongodb://127.0.0.1:27017
-MONGO_DB_NAME=tourism_kb
+MONGO_DB_NAME=ly001
 
 MILVUS_URL=http://127.0.0.1:19530
 CHUNKS_COLLECTION=ly_chunks

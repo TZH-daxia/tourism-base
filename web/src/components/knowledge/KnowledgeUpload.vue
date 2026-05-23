@@ -14,6 +14,10 @@ const fileInput = ref<HTMLInputElement>()
 const pollingTimer = ref<number | null>(null)
 const searchKeyword = ref('')
 const statusFilter = ref<'all' | 'processing' | 'completed' | 'failed'>('all')
+const collapsedTaskIds = ref<string[]>([])
+const initializedCollapsedTaskIds = ref<string[]>([])
+const deletingTaskId = ref('')
+const deletingTaskName = ref('')
 
 const summary = computed(() => ({
   total: tasks.value.length,
@@ -31,6 +35,16 @@ async function loadTasks() {
       status: statusFilter.value === 'all' ? '' : statusFilter.value,
     })
     tasks.value = Array.isArray(data) ? data : []
+    const currentTaskIds = new Set(tasks.value.map(item => item.task_id))
+    collapsedTaskIds.value = collapsedTaskIds.value.filter(id => currentTaskIds.has(id))
+    initializedCollapsedTaskIds.value = initializedCollapsedTaskIds.value.filter(id => currentTaskIds.has(id))
+    for (const task of tasks.value) {
+      if (!task.timeline?.length) continue
+      if (!initializedCollapsedTaskIds.value.includes(task.task_id)) {
+        initializedCollapsedTaskIds.value = [...initializedCollapsedTaskIds.value, task.task_id]
+        collapsedTaskIds.value = [...collapsedTaskIds.value, task.task_id]
+      }
+    }
   } catch (error: any) {
     errorMsg.value = error?.message || '获取已上传文件失败，请稍后重试。'
   } finally {
@@ -110,6 +124,34 @@ async function deleteTask(taskId: string) {
   }
 }
 
+function isTimelineCollapsed(taskId: string) {
+  return collapsedTaskIds.value.includes(taskId)
+}
+
+function toggleTimeline(taskId: string) {
+  if (isTimelineCollapsed(taskId)) {
+    collapsedTaskIds.value = collapsedTaskIds.value.filter(id => id !== taskId)
+  } else {
+    collapsedTaskIds.value = [...collapsedTaskIds.value, taskId]
+  }
+}
+
+function askDeleteTask(taskId: string, fileName: string) {
+  deletingTaskId.value = taskId
+  deletingTaskName.value = fileName
+}
+
+function cancelDeleteTask() {
+  deletingTaskId.value = ''
+  deletingTaskName.value = ''
+}
+
+async function confirmDeleteTask() {
+  if (!deletingTaskId.value) return
+  await deleteTask(deletingTaskId.value)
+  cancelDeleteTask()
+}
+
 function pct(task: TaskStatus) {
   if (task.status === 'completed') return 100
   return Math.min(99, Math.max(6, Math.round((task.progress || 0) * 100)))
@@ -185,7 +227,10 @@ function tone(task: TaskStatus) {
                   </div>
                   <div class="task-actions">
                     <span class="status-pill" :class="tone(task)">{{ task.current_step || task.status }}</span>
-                    <button class="delete-btn" @click="deleteTask(task.task_id)">删除</button>
+                    <button v-if="task.timeline?.length" class="ghost-btn" type="button" @click="toggleTimeline(task.task_id)">
+                      {{ isTimelineCollapsed(task.task_id) ? '展开过程' : '折叠过程' }}
+                    </button>
+                    <button class="delete-btn" type="button" @click="askDeleteTask(task.task_id, task.file_name)">删除</button>
                   </div>
                 </div>
 
@@ -197,7 +242,7 @@ function tone(task: TaskStatus) {
                   <span v-for="query in task.suggested_queries" :key="query">{{ query }}</span>
                 </div>
 
-                <div v-if="task.timeline?.length" class="timeline">
+                <div v-if="task.timeline?.length && !isTimelineCollapsed(task.task_id)" class="timeline">
                   <div v-for="(item, index) in task.timeline.slice(-5)" :key="`${task.task_id}-${index}`" class="timeline-item">
                     <div class="timeline-dot" :class="item.status"></div>
                     <div>
@@ -213,6 +258,23 @@ function tone(task: TaskStatus) {
                 暂无匹配的知识库文件。上传后，这里会展示每一份文件的处理进度和最终状态。
               </div>
             </section>
+          </div>
+        </div>
+      </div>
+    </Transition>
+
+    <Transition name="fade">
+      <div v-if="deletingTaskId" class="overlay confirm-overlay" @click.self="cancelDeleteTask">
+        <div class="confirm-card">
+          <div class="eyebrow">Delete Confirm</div>
+          <h3>删除这份资料？</h3>
+          <p>
+            删除后，资料卡片和对应知识库数据都会被移除。
+            <strong>{{ deletingTaskName }}</strong>
+          </p>
+          <div class="confirm-actions">
+            <button class="close-btn ghost" type="button" @click="cancelDeleteTask">取消</button>
+            <button class="danger-btn" type="button" @click="confirmDeleteTask">确认删除</button>
           </div>
         </div>
       </div>
@@ -490,6 +552,15 @@ function tone(task: TaskStatus) {
   font-weight: 700;
 }
 
+.ghost-btn {
+  border: 1px solid rgba(128, 92, 53, 0.14);
+  border-radius: 999px;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.76);
+  color: var(--text-secondary);
+  font-weight: 700;
+}
+
 .progress-bar {
   height: 8px;
   margin-top: 14px;
@@ -572,6 +643,52 @@ function tone(task: TaskStatus) {
   border-radius: 20px;
   border: 1px dashed rgba(128, 92, 53, 0.16);
   color: var(--text-secondary);
+}
+
+.confirm-overlay {
+  z-index: 45;
+}
+
+.confirm-card {
+  width: min(420px, 100%);
+  padding: 24px;
+  border-radius: 24px;
+  background: rgba(255, 250, 241, 0.98);
+  border: 1px solid rgba(128, 92, 53, 0.16);
+  box-shadow: 0 24px 60px rgba(43, 31, 16, 0.18);
+}
+
+.confirm-card h3 {
+  margin: 10px 0 8px;
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 34px;
+}
+
+.confirm-card p {
+  margin: 0;
+  line-height: 1.7;
+  color: var(--text-secondary);
+}
+
+.confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.close-btn.ghost {
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.danger-btn {
+  border: none;
+  border-radius: 14px;
+  padding: 10px 14px;
+  background: linear-gradient(135deg, #d75b49, #b33d35);
+  color: #fff8f4;
+  font-weight: 700;
+  cursor: pointer;
 }
 
 .fade-enter-active,

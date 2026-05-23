@@ -30,9 +30,12 @@ def mock_services():
     mgr.get_all_tasks = AsyncMock(return_value=[])
     mgr.delete_task = AsyncMock(return_value=None)
     mgr.delete_session = AsyncMock(return_value=2)
+    mgr.rename_session = AsyncMock(return_value=True)
+    mgr.get_chat_sessions = AsyncMock(return_value=[])
     mgr.has_completed_tasks = AsyncMock(return_value=False)
     mgr.update_task = AsyncMock()
     mgr.ensure_indexes = AsyncMock()
+    mgr.next_session_id = AsyncMock(return_value="1")
     mock_mongo_cls.get.return_value = mgr
 
     yield {
@@ -241,6 +244,7 @@ class TestRuntimeModelSettings:
         assert resp.status_code == 200
         data = resp.json()
         assert data["vision_required"] is True
+        assert data["is_default"] is True
         assert "warning" in data
 
     def test_update_runtime_model_settings(self, client, mock_services):
@@ -257,7 +261,15 @@ class TestRuntimeModelSettings:
         assert data["api_key"] == "sk-demo"
         assert data["base_url"] == "https://example.com/v1"
         assert data["model"] == "gpt-4.1-mini"
+        assert data["is_default"] is False
         mock_services["reset_llm"].assert_called_once()
+
+    def test_reset_runtime_model_settings(self, client, mock_services):
+        resp = client.delete("/api/knowledge/runtime-model-settings")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["is_default"] is True
+        mock_services["reset_llm"].assert_called()
 
 
 class TestHistory:
@@ -268,8 +280,38 @@ class TestHistory:
         assert "messages" in data
         assert "total" in data
 
+    def test_list_chat_sessions_sorted_from_backend(self, client, mock_services):
+        mock_services["mongo_mgr"].get_chat_sessions.return_value = [
+            {
+                "session_id": "2",
+                "title": "第二个会话",
+                "updated_at": "2026-05-22T10:00:00",
+                "created_at": "2026-05-22T09:00:00",
+                "message_count": 4,
+            },
+            {
+                "session_id": "1",
+                "title": "第一个会话",
+                "updated_at": "2026-05-22T09:00:00",
+                "created_at": "2026-05-22T08:00:00",
+                "message_count": 2,
+            },
+        ]
+
+        resp = client.get("/api/knowledge/chat/sessions")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert [item["session_id"] for item in data] == ["2", "1"]
+        assert data[0]["message_count"] == 4
+
     def test_delete_chat_session_removes_mongo_messages(self, client, mock_services):
         resp = client.delete("/api/knowledge/chat/session_1")
         assert resp.status_code == 200
         mock_services["mongo_mgr"].delete_session.assert_awaited_with("session_1")
         assert resp.json()["deleted"] == 2
+
+    def test_rename_chat_session(self, client, mock_services):
+        resp = client.patch("/api/knowledge/chat/2", json={"title": "新的标题"})
+        assert resp.status_code == 200
+        assert resp.json()["title"] == "新的标题"
+        mock_services["mongo_mgr"].rename_session.assert_awaited_with("2", "新的标题")

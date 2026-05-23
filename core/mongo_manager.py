@@ -8,6 +8,7 @@ from typing import Optional
 import uuid
 
 from pymongo import MongoClient
+from pymongo import ReturnDocument
 
 from core.config import get_settings
 from core.tourism_metadata import build_suggested_queries
@@ -24,6 +25,7 @@ class MongoManager:
         self.db = self.client[settings.mongo_db_name]
         self.chat_messages = self.db["chat_messages"]
         self.import_tasks = self.db["import_tasks"]
+        self.counters = self.db["counters"]
 
     @classmethod
     def get(cls) -> "MongoManager":
@@ -32,13 +34,34 @@ class MongoManager:
         return cls._instance
 
     async def ensure_indexes(self):
-        self.chat_messages.create_index("session_id")
-        self.chat_messages.create_index([("updated_at", -1)])
+        await self.migrate_legacy_chat_messages()
+        self.chat_messages.create_index(
+            "session_id",
+            unique=True,
+            partialFilterExpression={"messages": {"$exists": True}},
+        )
+        self.chat_messages.create_index(
+            [("session_id", 1), ("updated_at", -1)],
+            partialFilterExpression={"messages": {"$exists": True}},
+        )
+        self.chat_messages.create_index(
+            [("updated_at", -1), ("session_id", 1)],
+            partialFilterExpression={"messages": {"$exists": True}},
+        )
         self.import_tasks.create_index("task_id", unique=True)
         self.import_tasks.create_index([("city", 1), ("updated_at", -1)])
         self.import_tasks.create_index([("status", 1), ("updated_at", -1)])
-        await self.migrate_legacy_chat_messages()
+        await self._ensure_session_counter_seeded()
         logger.info("MongoDB indexes ready")
+
+    async def next_session_id(self) -> str:
+        doc = self.counters.find_one_and_update(
+            {"_id": "chat_session_id"},
+            {"$inc": {"seq": 1}},
+            upsert=True,
+            return_document=ReturnDocument.AFTER,
+        )
+        return str(doc.get("seq", 1))
 
     async def save_message(
         self,
@@ -94,6 +117,37 @@ class MongoManager:
     async def delete_session(self, session_id: str) -> int:
         result = self.chat_messages.delete_many({"session_id": session_id})
         return result.deleted_count
+
+    async def rename_session(self, session_id: str, title: str) -> bool:
+        result = self.chat_messages.update_one(
+            {"session_id": session_id, "messages": {"$exists": True}},
+            {"$set": {"title": title.strip(), "updated_at": datetime.now()}},
+        )
+        return result.matched_count > 0
+
+    async def get_chat_sessions(self, limit: int = 100) -> List[Dict]:
+        cursor = self.chat_messages.find(
+            {"messages": {"$exists": True}},
+            {"session_id": 1, "title": 1, "messages": 1, "updated_at": 1, "created_at": 1, "_id": 0},
+        ).sort("updated_at", -1)
+        docs = list(cursor.limit(limit))
+        sessions = []
+        for doc in docs:
+            messages = [self._normalize_message(item) for item in doc.get("messages", [])]
+            title = (doc.get("title") or "").strip()
+            if not title:
+                first_user_message = next((item.get("content", "").strip() for item in messages if item.get("role") == "user" and item.get("content")), "")
+                title = first_user_message[:18]
+            sessions.append(
+                {
+                    "session_id": str(doc.get("session_id", "")),
+                    "title": title,
+                    "updated_at": doc.get("updated_at") or datetime.now(),
+                    "created_at": doc.get("created_at") or doc.get("updated_at") or datetime.now(),
+                    "message_count": len(messages),
+                }
+            )
+        return sessions
 
     async def create_task(
         self,
@@ -257,6 +311,25 @@ class MongoManager:
         for session_id in session_ids:
             if session_id:
                 await self._migrate_legacy_session(session_id)
+
+    async def _ensure_session_counter_seeded(self):
+        existing = self.counters.find_one({"_id": "chat_session_id"})
+        if existing and isinstance(existing.get("seq"), int):
+            return
+
+        max_numeric_session_id = 0
+        for session_id in self.chat_messages.distinct("session_id"):
+            if isinstance(session_id, int):
+                max_numeric_session_id = max(max_numeric_session_id, session_id)
+                continue
+            if isinstance(session_id, str) and session_id.isdigit():
+                max_numeric_session_id = max(max_numeric_session_id, int(session_id))
+
+        self.counters.update_one(
+            {"_id": "chat_session_id"},
+            {"$set": {"seq": max_numeric_session_id}},
+            upsert=True,
+        )
 
     def _message_from_legacy_doc(self, doc: Dict) -> Dict:
         return self._normalize_message(

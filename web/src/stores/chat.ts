@@ -1,7 +1,7 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 
-import { knowledgeApi, type ChatImage, type ChatSource, type RecommendationCard } from '../api/knowledge'
+import { knowledgeApi, type ChatImage, type ChatSessionSummary, type ChatSource, type RecommendationCard } from '../api/knowledge'
 
 export interface Message {
   role: 'user' | 'assistant'
@@ -21,6 +21,9 @@ export interface Session {
   title: string
   messages: Message[]
   updated_at: string
+  created_at?: string
+  message_count?: number
+  history_loaded?: boolean
 }
 
 const LS_SESSIONS = 'tourism_sessions'
@@ -52,14 +55,22 @@ export const useChatStore = defineStore('chat', () => {
     return session.session_id
   }
 
+  function sortSessions() {
+    sessions.value.sort((a, b) => +new Date(b.updated_at) - +new Date(a.updated_at))
+  }
+
   function createSession() {
+    const now = new Date().toISOString()
     const id = `local_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
     sessions.value.unshift({
       session_id: id,
       backend_id: '',
       title: '',
       messages: [],
-      updated_at: new Date().toISOString(),
+      updated_at: now,
+      created_at: now,
+      message_count: 0,
+      history_loaded: true,
     })
     currentId.value = id
     persist()
@@ -70,11 +81,15 @@ export const useChatStore = defineStore('chat', () => {
     persist()
   }
 
-  function renameSession(id: string, title: string) {
+  async function renameSession(id: string, title: string) {
     const session = sessions.value.find(item => item.session_id === id)
     if (!session) return
-    session.title = title
+    const nextTitle = title.trim()
+    const backendId = getBackendSid(session)
+    if (backendId) await knowledgeApi.renameSession(backendId, nextTitle)
+    session.title = nextTitle
     session.updated_at = new Date().toISOString()
+    sortSessions()
     persist()
   }
 
@@ -98,6 +113,46 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
+  function mergeBackendSessions(items: ChatSessionSummary[]) {
+    const localOnly = sessions.value.filter(item => !getBackendSid(item))
+    const localByBackendId = new Map<string, Session>()
+    for (const session of sessions.value) {
+      const backendId = getBackendSid(session)
+      if (backendId) localByBackendId.set(backendId, session)
+    }
+
+    const mergedRemote: Session[] = items.map(item => {
+      const existing = localByBackendId.get(item.session_id)
+      return {
+        session_id: existing?.session_id || item.session_id,
+        backend_id: item.session_id,
+        title: item.title || existing?.title || '',
+        messages: existing?.messages || [],
+        updated_at: item.updated_at,
+        created_at: item.created_at,
+        message_count: item.message_count,
+        history_loaded: existing?.history_loaded || false,
+      }
+    })
+
+    sessions.value = [...localOnly, ...mergedRemote]
+    sortSessions()
+
+    if (!sessions.value.find(item => item.session_id === currentId.value)) {
+      currentId.value = sessions.value[0]?.session_id || ''
+    }
+    persist()
+  }
+
+  async function refreshSessions() {
+    try {
+      const data = await knowledgeApi.getSessions()
+      mergeBackendSessions(data)
+    } catch {
+      persist()
+    }
+  }
+
   async function sendMessage(text: string) {
     if (!text.trim() || loading.value) return
     if (abortCtrl) abortCtrl.abort()
@@ -111,11 +166,12 @@ export const useChatStore = defineStore('chat', () => {
     abortCtrl = new AbortController()
     loading.value = true
     const startedAt = Date.now()
-    const userMessage: Message = { role: 'user', content: text, timestamp: new Date().toISOString() }
+    const now = new Date().toISOString()
+    const userMessage: Message = { role: 'user', content: text, timestamp: now }
     const assistantMessage: Message = {
       role: 'assistant',
       content: '',
-      timestamp: new Date().toISOString(),
+      timestamp: now,
       images: [],
       sources: [],
       thinkingTime: 0,
@@ -123,6 +179,9 @@ export const useChatStore = defineStore('chat', () => {
     }
     session.messages.push(userMessage, assistantMessage)
     session.updated_at = new Date().toISOString()
+    session.message_count = session.messages.length
+    session.history_loaded = true
+    sortSessions()
     persist()
 
     let fullContent = ''
@@ -138,6 +197,8 @@ export const useChatStore = defineStore('chat', () => {
           ragReferenced = ragReferenced || Boolean(chunk.ragReferenced)
           if (chunk.sessionId && !session.backend_id) {
             session.backend_id = chunk.sessionId
+            session.session_id = chunk.sessionId
+            currentId.value = chunk.sessionId
           }
         } else if (chunk.type === 'done') {
           last.content = fullContent || last.content
@@ -151,12 +212,17 @@ export const useChatStore = defineStore('chat', () => {
           }
           if (chunk.sessionId && !session.backend_id) {
             session.backend_id = chunk.sessionId
+            session.session_id = chunk.sessionId
+            currentId.value = chunk.sessionId
           }
           session.updated_at = new Date().toISOString()
+          session.message_count = session.messages.length
+          sortSessions()
           persist()
         } else if (chunk.type === 'error') {
           last.pending = false
           last.content = fullContent || chunk.error || '[错误] 请求失败，请重试'
+          session.message_count = session.messages.length
         }
       }
     } catch (error: any) {
@@ -180,7 +246,10 @@ export const useChatStore = defineStore('chat', () => {
       loading.value = false
       abortCtrl = null
       session.updated_at = new Date().toISOString()
+      session.message_count = session.messages.length
+      sortSessions()
       persist()
+      await refreshSessions()
     }
   }
 
@@ -202,6 +271,8 @@ export const useChatStore = defineStore('chat', () => {
     }
     if (session) {
       session.updated_at = new Date().toISOString()
+      session.message_count = session.messages.length
+      sortSessions()
       persist()
     }
   }
@@ -221,6 +292,8 @@ export const useChatStore = defineStore('chat', () => {
         sources: message.sources || [],
         pending: false,
       }))
+      session.message_count = session.messages.length
+      session.history_loaded = true
       persist()
     } catch {
       // best effort
@@ -240,6 +313,7 @@ export const useChatStore = defineStore('chat', () => {
     switchSession,
     renameSession,
     deleteSession,
+    refreshSessions,
     fetchRecommendations,
     sendMessage,
     stopGeneration,

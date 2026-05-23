@@ -32,8 +32,14 @@ export interface RuntimeModelSettings {
   api_key: string
   base_url: string
   model: string
+  is_default: boolean
   vision_required: boolean
   warning: string
+}
+
+export interface RuntimeModelTestResult {
+  ok: boolean
+  message: string
 }
 
 export interface KnowledgeUploadResponse {
@@ -64,6 +70,14 @@ export interface ChatMessage {
   timestamp: string
   images?: ChatImage[]
   sources?: ChatSource[]
+}
+
+export interface ChatSessionSummary {
+  session_id: string
+  title: string
+  updated_at: string
+  created_at: string
+  message_count: number
 }
 
 export interface StreamChunk {
@@ -129,6 +143,26 @@ export const knowledgeApi = {
     return resp.json()
   },
 
+  async resetRuntimeModelSettings(): Promise<RuntimeModelSettings> {
+    const resp = await fetch('/api/knowledge/runtime-model-settings', { method: 'DELETE' })
+    if (!resp.ok) throw new Error((await resp.json().catch(() => ({}))).detail || '恢复默认模型失败')
+    return resp.json()
+  },
+
+  async testRuntimeModelSettings(payload: {
+    api_key: string
+    base_url: string
+    model: string
+  }): Promise<RuntimeModelTestResult> {
+    const resp = await fetch('/api/knowledge/runtime-model-settings/test', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+    if (!resp.ok) throw new Error((await resp.json().catch(() => ({}))).detail || '模型测试失败')
+    return resp.json()
+  },
+
   async deleteTask(taskId: string): Promise<void> {
     const resp = await fetch(`/api/knowledge/task/${taskId}`, { method: 'DELETE' })
     if (!resp.ok) throw new Error((await resp.json().catch(() => ({}))).detail || '删除文件失败')
@@ -139,9 +173,24 @@ export const knowledgeApi = {
     if (!resp.ok) throw new Error((await resp.json().catch(() => ({}))).detail || '删除会话失败')
   },
 
+  async renameSession(sessionId: string, title: string): Promise<void> {
+    const resp = await fetch(`/api/knowledge/chat/${sessionId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title }),
+    })
+    if (!resp.ok) throw new Error((await resp.json().catch(() => ({}))).detail || '重命名会话失败')
+  },
+
   async getHistory(sessionId: string): Promise<{ session_id: string; messages: ChatMessage[]; total: number }> {
     const resp = await fetch(`/api/knowledge/chat/${sessionId}/history`)
     if (!resp.ok) throw new Error('获取历史失败')
+    return resp.json()
+  },
+
+  async getSessions(): Promise<ChatSessionSummary[]> {
+    const resp = await fetch('/api/knowledge/chat/sessions')
+    if (!resp.ok) throw new Error('获取会话列表失败')
     return resp.json()
   },
 

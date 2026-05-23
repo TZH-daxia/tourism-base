@@ -16,7 +16,7 @@ class Settings(BaseSettings):
 
     # ========== MongoDB ==========
     mongo_url: str = "mongodb://192.168.10.129:27017"
-    mongo_db_name: str = "tourism_kb"
+    mongo_db_name: str = "ly001"
 
     # ========== Milvus ==========
     milvus_url: str = "http://192.168.10.129:19530"
@@ -90,7 +90,15 @@ def get_runtime_llm_settings() -> dict[str, str]:
     }
 
 
+def has_runtime_llm_overrides() -> bool:
+    return any(_runtime_llm_overrides.get(key, "").strip() for key in ("api_key", "base_url", "model"))
+
+
 def set_runtime_llm_settings(api_key: str, base_url: str, model: str):
     _runtime_llm_overrides["api_key"] = api_key.strip()
     _runtime_llm_overrides["base_url"] = base_url.strip().rstrip("/")
     _runtime_llm_overrides["model"] = model.strip()
+
+
+def clear_runtime_llm_settings():
+    _runtime_llm_overrides.clear()

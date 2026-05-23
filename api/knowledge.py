@@ -21,7 +21,10 @@ from core.llm_factory import reset as reset_llm_cache
 from core.milvus_manager import MilvusManager
 from core.minio_manager import get_object_bytes
 from core.config import get_runtime_llm_settings
+from core.config import clear_runtime_llm_settings
+from core.config import has_runtime_llm_overrides
 from core.config import set_runtime_llm_settings
+from core.config import get_settings
 from core.mongo_manager import MongoManager
 from core.tourism_metadata import build_product_id
 from core.tourism_metadata import build_suggested_queries
@@ -30,10 +33,13 @@ from core.tourism_metadata import infer_doc_type
 from graphs.states import IngestState
 from graphs.states import RAGChatState
 from models.knowledge import KnowledgeUploadResponse
+from models.knowledge import ChatSessionSummary
+from models.knowledge import ChatSessionRenameRequest
 from models.knowledge import RAGChatRequest
 from models.knowledge import RAGChatResponse
 from models.knowledge import RecommendationCard
 from models.knowledge import RuntimeModelSettings
+from models.knowledge import RuntimeModelSettingsTestResponse
 from models.knowledge import RuntimeModelSettingsUpdate
 from models.knowledge import TaskStatusResponse
 from nodes.ingest.document_loader import enrich_markdown_state
@@ -180,6 +186,7 @@ async def get_runtime_model_settings():
         api_key=data["api_key"],
         base_url=data["base_url"],
         model=data["model"],
+        is_default=not has_runtime_llm_overrides(),
     )
 
 
@@ -199,7 +206,64 @@ async def update_runtime_model_settings(payload: RuntimeModelSettingsUpdate):
         api_key=data["api_key"],
         base_url=data["base_url"],
         model=data["model"],
+        is_default=False,
     )
+
+
+@router.delete("/runtime-model-settings", response_model=RuntimeModelSettings)
+async def reset_runtime_model_settings():
+    clear_runtime_llm_settings()
+    reset_llm_cache()
+    data = get_runtime_llm_settings()
+    return RuntimeModelSettings(
+        api_key=data["api_key"],
+        base_url=data["base_url"],
+        model=data["model"],
+        is_default=True,
+    )
+
+
+@router.post("/runtime-model-settings/test", response_model=RuntimeModelSettingsTestResponse)
+async def test_runtime_model_settings(payload: RuntimeModelSettingsUpdate):
+    if not payload.api_key.strip():
+        raise HTTPException(400, "API Key 不能为空")
+    if not payload.base_url.strip():
+        raise HTTPException(400, "Base URL 不能为空")
+    if not payload.model.strip():
+        raise HTTPException(400, "模型名不能为空")
+
+    try:
+        from langchain_openai import ChatOpenAI
+        from langchain_core.messages import HumanMessage
+        from langchain_core.messages import SystemMessage
+    except Exception as exc:
+        raise HTTPException(500, f"模型测试依赖不可用: {exc}")
+
+    try:
+        settings = get_settings()
+        client = ChatOpenAI(
+            model=payload.model.strip(),
+            temperature=settings.llm_default_temperature,
+            api_key=payload.api_key.strip(),
+            base_url=payload.base_url.strip().rstrip("/"),
+            extra_body={"enable_thinking": False},
+        )
+        await client.ainvoke(
+            [
+                SystemMessage(content="你是一个连通性测试助手，请只回复ok。"),
+                HumanMessage(content="请回复ok"),
+            ]
+        )
+        return RuntimeModelSettingsTestResponse(ok=True, message="连接测试通过，可以保存并生效。")
+    except Exception as exc:
+        detail = str(exc).strip() or "模型未返回有效响应"
+        short_detail = detail.splitlines()[0][:140]
+        if "<" in short_detail or "doctype html" in short_detail.lower():
+            short_detail = "接口返回异常，请确认 Base URL 指向可用的 OpenAI 兼容服务。"
+        return RuntimeModelSettingsTestResponse(
+            ok=False,
+            message=f"当前自定义模型暂不可用，请切回默认模型，或检查 API Key、Base URL 和模型名后重新测试。{short_detail}",
+        )
 
 
 @router.get("/assets/{bucket_name}/{object_path:path}")
@@ -231,7 +295,7 @@ async def delete_task(task_id: str):
 @router.post("/chat/stream")
 async def rag_chat_stream(request: RAGChatRequest):
     mongo = MongoManager.get()
-    session_id = request.session_id or str(uuid.uuid4())
+    session_id = request.session_id or await mongo.next_session_id()
     should_rag = False
     rag_state: RAGChatState | None = None
 
@@ -327,8 +391,8 @@ async def rag_chat_stream(request: RAGChatRequest):
 
 @router.post("/chat", response_model=RAGChatResponse)
 async def rag_chat(request: RAGChatRequest):
-    session_id = request.session_id or str(uuid.uuid4())
     mongo = MongoManager.get()
+    session_id = request.session_id or await mongo.next_session_id()
 
     if not request.rag_enabled:
         llm = get_llm()
@@ -376,10 +440,24 @@ async def get_history(session_id: str):
     return {"session_id": session_id, "messages": messages, "total": len(messages)}
 
 
+@router.get("/chat/sessions", response_model=List[ChatSessionSummary])
+async def list_chat_sessions():
+    sessions = await MongoManager.get().get_chat_sessions(limit=100)
+    return [ChatSessionSummary(**session) for session in sessions]
+
+
 @router.delete("/chat/{session_id}")
 async def delete_chat_session(session_id: str):
     deleted = await MongoManager.get().delete_session(session_id)
     return {"ok": True, "session_id": session_id, "deleted": deleted}
+
+
+@router.patch("/chat/{session_id}")
+async def rename_chat_session(session_id: str, payload: ChatSessionRenameRequest):
+    renamed = await MongoManager.get().rename_session(session_id, payload.title)
+    if not renamed:
+        raise HTTPException(404, "会话不存在")
+    return {"ok": True, "session_id": session_id, "title": payload.title.strip()}
 
 
 def _sse(payload: dict) -> str:
