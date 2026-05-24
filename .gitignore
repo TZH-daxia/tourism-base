@@ -13,6 +13,11 @@ __pycache__/
 uploads/
 test_uploads/
 test_output/
+temp_import/
+import_file_list.txt
+source_names_utf8.txt
+
+*.log
 
 backend-live.out.log
 backend-live.err.log

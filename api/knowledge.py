@@ -32,6 +32,7 @@ from core.tourism_metadata import infer_city_from_filename
 from core.tourism_metadata import infer_doc_type
 from graphs.states import IngestState
 from graphs.states import RAGChatState
+from models.knowledge import ChatHistoryTurn
 from models.knowledge import KnowledgeUploadResponse
 from models.knowledge import ChatSessionSummary
 from models.knowledge import ChatSessionRenameRequest
@@ -49,6 +50,49 @@ router = APIRouter(prefix="/knowledge", tags=["knowledge"])
 _task_status: dict = {}
 
 PLAIN_SYSTEM_PROMPT = "你是一个专业的旅游顾问，请用中文给出清晰、友好、实用的回答。"
+
+
+def _normalize_history(history: List[ChatHistoryTurn] | List[dict] | None) -> List[dict]:
+    items: List[dict] = []
+    for turn in history or []:
+        role = (turn.role if isinstance(turn, ChatHistoryTurn) else turn.get("role", "")).strip()
+        content = (turn.content if isinstance(turn, ChatHistoryTurn) else turn.get("content", "")).strip()
+        if role in {"user", "assistant"} and content:
+            items.append({"role": role, "content": content})
+    return items
+
+
+def _build_plain_llm_messages(system_prompt: str, history: List[dict]):
+    try:
+        from langchain_core.messages import AIMessage
+        from langchain_core.messages import HumanMessage
+        from langchain_core.messages import SystemMessage
+
+        llm_messages = [SystemMessage(content=system_prompt)]
+        for item in history:
+            if item.get("role") == "assistant":
+                llm_messages.append(AIMessage(content=item.get("content", "")))
+            else:
+                llm_messages.append(HumanMessage(content=item.get("content", "")))
+        return llm_messages
+    except Exception:
+        conversation = [system_prompt]
+        for item in history:
+            prefix = "Assistant" if item.get("role") == "assistant" else "User"
+            conversation.append(f"{prefix}: {item.get('content', '')}")
+        return conversation
+
+
+def _strip_current_user(history: List[dict], message: str) -> List[dict]:
+    if history and history[-1].get("role") == "user" and history[-1].get("content", "").strip() == message.strip():
+        return history[:-1]
+    return history
+
+
+def _ensure_current_user(history: List[dict], message: str) -> List[dict]:
+    if history and history[-1].get("role") == "user" and history[-1].get("content", "").strip() == message.strip():
+        return history
+    return [*history, {"role": "user", "content": message}]
 
 
 @router.post("/upload", response_model=KnowledgeUploadResponse)
@@ -295,16 +339,22 @@ async def delete_task(task_id: str):
 @router.post("/chat/stream")
 async def rag_chat_stream(request: RAGChatRequest):
     mongo = MongoManager.get()
-    session_id = request.session_id or await mongo.next_session_id()
+    session_id = request.session_id or (f"guest_{uuid.uuid4().hex[:12]}" if request.guest_mode else await mongo.next_session_id())
     should_rag = False
     rag_state: RAGChatState | None = None
+    request_history = _normalize_history(request.history)
 
     if request.rag_enabled:
         try:
             if await mongo.has_completed_tasks():
                 should_rag = True
-                history = await mongo.get_recent(session_id, limit=10)
-                history_dicts = [{"role": msg.get("role", ""), "content": msg.get("content", "")} for msg in history]
+                if request_history:
+                    history_dicts = _strip_current_user(request_history, request.message)
+                elif request.guest_mode:
+                    history_dicts = []
+                else:
+                    history = await mongo.get_recent(session_id, limit=10)
+                    history_dicts = [{"role": msg.get("role", ""), "content": msg.get("content", "")} for msg in history]
                 init = RAGChatState(query=request.message, session_id=session_id, history=history_dicts)
                 from graphs.graph_builder import query_graph
 
@@ -355,28 +405,34 @@ async def rag_chat_stream(request: RAGChatRequest):
                 )
                 return
 
-            await mongo.save_message(session_id, "user", request.message)
+            if not request.guest_mode:
+                await mongo.save_message(session_id, "user", request.message)
             llm = get_llm()
             if not llm:
                 fallback = "抱歉，AI 服务暂时不可用，请稍后再试。"
-                await mongo.save_message(session_id, "assistant", fallback)
+                if not request.guest_mode:
+                    await mongo.save_message(session_id, "assistant", fallback)
                 yield _sse({"token": fallback, "session_id": session_id, "rag_referenced": False})
                 yield _sse({"done": True, "session_id": session_id, "sources": [], "images": []})
                 return
 
-            try:
-                from langchain_core.messages import HumanMessage
-                from langchain_core.messages import SystemMessage
+            if request_history:
+                llm_history = _ensure_current_user(request_history, request.message)
+            elif request.guest_mode:
+                llm_history = [{"role": "user", "content": request.message}]
+            else:
+                history = await mongo.get_recent(session_id, limit=10)
+                llm_history = [{"role": msg.get("role", ""), "content": msg.get("content", "")} for msg in history]
+                llm_history.append({"role": "user", "content": request.message})
 
-                llm_messages = [SystemMessage(content=PLAIN_SYSTEM_PROMPT), HumanMessage(content=request.message)]
-            except Exception:
-                llm_messages = [PLAIN_SYSTEM_PROMPT, request.message]
+            llm_messages = _build_plain_llm_messages(PLAIN_SYSTEM_PROMPT, llm_history)
 
             async for chunk in llm.astream(llm_messages):
                 if chunk.content:
                     full += chunk.content
                     yield _sse({"token": chunk.content, "session_id": session_id, "rag_referenced": False})
-            await mongo.save_message(session_id, "assistant", full)
+            if not request.guest_mode:
+                await mongo.save_message(session_id, "assistant", full)
             yield _sse({"done": True, "session_id": session_id, "sources": [], "images": []})
         except Exception as exc:
             logger.error(f"Stream error: {exc}")
@@ -392,20 +448,24 @@ async def rag_chat_stream(request: RAGChatRequest):
 @router.post("/chat", response_model=RAGChatResponse)
 async def rag_chat(request: RAGChatRequest):
     mongo = MongoManager.get()
-    session_id = request.session_id or await mongo.next_session_id()
+    session_id = request.session_id or (f"guest_{uuid.uuid4().hex[:12]}" if request.guest_mode else await mongo.next_session_id())
+    request_history = _normalize_history(request.history)
 
     if not request.rag_enabled:
         llm = get_llm()
         if not llm:
             return RAGChatResponse(session_id=session_id, message="抱歉，AI 服务暂时不可用，请稍后再试。")
 
-        try:
-            from langchain_core.messages import HumanMessage
-            from langchain_core.messages import SystemMessage
+        if request_history:
+            llm_history = _ensure_current_user(request_history, request.message)
+        elif request.guest_mode:
+            llm_history = [{"role": "user", "content": request.message}]
+        else:
+            history = await mongo.get_recent(session_id, limit=10)
+            llm_history = [{"role": msg.get("role", ""), "content": msg.get("content", "")} for msg in history]
+            llm_history.append({"role": "user", "content": request.message})
 
-            llm_messages = [SystemMessage(content=PLAIN_SYSTEM_PROMPT), HumanMessage(content=request.message)]
-        except Exception:
-            llm_messages = [PLAIN_SYSTEM_PROMPT, request.message]
+        llm_messages = _build_plain_llm_messages(PLAIN_SYSTEM_PROMPT, llm_history)
 
         chunks: list[str] = []
         async for chunk in llm.astream(llm_messages):
@@ -413,11 +473,17 @@ async def rag_chat(request: RAGChatRequest):
                 chunks.append(chunk.content)
         return RAGChatResponse(session_id=session_id, message="".join(chunks))
 
-    history = await mongo.get_recent(session_id, limit=10) if request.session_id else []
+    if request_history:
+        history_payload = _strip_current_user(request_history, request.message)
+    elif request.session_id and not request.guest_mode:
+        history = await mongo.get_recent(session_id, limit=10)
+        history_payload = [{"role": msg.get("role", ""), "content": msg.get("content", "")} for msg in history]
+    else:
+        history_payload = []
     init = RAGChatState(
         query=request.message,
         session_id=session_id,
-        history=[{"role": msg.get("role", ""), "content": msg.get("content", "")} for msg in history],
+        history=history_payload,
     )
     from graphs.graph_builder import query_graph
 

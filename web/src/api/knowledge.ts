@@ -72,6 +72,11 @@ export interface ChatMessage {
   sources?: ChatSource[]
 }
 
+export interface ChatHistoryTurn {
+  role: 'user' | 'assistant'
+  content: string
+}
+
 export interface ChatSessionSummary {
   session_id: string
   title: string
@@ -199,6 +204,8 @@ export const knowledgeApi = {
     sessionId: string | undefined,
     signal: AbortSignal,
     ragEnabled = true,
+    guestMode = false,
+    history: ChatHistoryTurn[] = [],
   ): AsyncGenerator<StreamChunk> {
     const resp = await fetch('/api/knowledge/chat/stream', {
       method: 'POST',
@@ -207,6 +214,8 @@ export const knowledgeApi = {
         message,
         session_id: sessionId || null,
         rag_enabled: ragEnabled,
+        guest_mode: guestMode,
+        history,
       }),
       signal,
     })

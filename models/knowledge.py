@@ -59,10 +59,17 @@ class RuntimeModelSettingsTestResponse(BaseModel):
     message: str = ""
 
 
+class ChatHistoryTurn(BaseModel):
+    role: str
+    content: str
+
+
 class RAGChatRequest(BaseModel):
     message: str
     session_id: Optional[str] = None
     rag_enabled: bool = True
+    guest_mode: bool = False
+    history: List[ChatHistoryTurn] = Field(default_factory=list)
 
 
 class RAGChatResponse(BaseModel):

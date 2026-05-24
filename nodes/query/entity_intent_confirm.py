@@ -103,6 +103,10 @@ def entity_intent_confirm(state: RAGChatState) -> Dict[str, Any]:
         }
     except Exception as exc:
         logger.error(f"Entity confirm failed: {exc}")
+        recovered = _recover_from_product_search(state)
+        if recovered:
+            recovered["errors"] = state.errors + [f"[entity_intent_confirm_recovered] {exc}"]
+            return recovered
         return {
             "errors": state.errors + [f"[entity_intent_confirm] {exc}"],
             "confirm_answer": "抱歉，当前无法解析您的问题，请稍后重试。",
@@ -112,6 +116,8 @@ def entity_intent_confirm(state: RAGChatState) -> Dict[str, Any]:
 def _extract_city_and_intent(state: RAGChatState) -> Dict[str, Any]:
     history_text = "\n".join(f"{item.get('role', '')}: {item.get('content', '')}" for item in (state.history or [])[-6:])
     fallback = _fallback_extract(state.query, history_text)
+    if _can_use_fallback_directly(state.query, history_text, fallback):
+        return fallback
     llm = get_llm(json_mode=True)
     if not llm:
         return fallback
@@ -130,6 +136,22 @@ def _extract_city_and_intent(state: RAGChatState) -> Dict[str, Any]:
     except Exception as exc:
         logger.warning(f"LLM city extraction skipped: {exc}")
     return fallback
+
+
+def _can_use_fallback_directly(query: str, history_text: str, fallback: Dict[str, Any]) -> bool:
+    city = (fallback.get("city") or "").strip()
+    intent = (fallback.get("intent") or "").strip()
+    requested_doc_types = fallback.get("requested_doc_types") or []
+    if not city or not intent or not requested_doc_types:
+        return False
+
+    direct_city_in_query = city in (query or "")
+    direct_intent_hit = any(
+        token in (query or "")
+        for token in ("交通", "怎么去", "机场", "高铁", "酒店", "住宿", "住哪", "美食", "好吃", "吃什么", "路线", "线路", "行程", "图片", "照片", "景点", "好玩", "推荐", "攻略")
+    )
+    history_is_light = len((history_text or "").strip()) < 80
+    return direct_city_in_query and direct_intent_hit and history_is_light
 
 
 def _fallback_extract(query: str, history_text: str) -> Dict[str, Any]:
@@ -183,6 +205,50 @@ def _normalize_product_hits(hits: List[Dict]) -> List[Dict]:
         )
     rows.sort(key=lambda item: item.get("score", 0.0), reverse=True)
     return rows
+
+
+def _recover_from_product_search(state: RAGChatState) -> Dict[str, Any] | None:
+    try:
+        query_dense, query_sparse = encode_single(state.query)
+        product_hits = MilvusManager.search_products(query_dense, query_sparse, top_k=5)
+        products = _normalize_product_hits(product_hits)
+        if not products:
+            return None
+
+        primary_city = products[0].get("city", "")
+        requested_doc_types = OVERVIEW_DOC_TYPES
+        recommended_queries = products[0].get("suggested_queries") or build_suggested_queries(primary_city, requested_doc_types)
+        need_images = detect_need_images(state.query)
+
+        product_ids = []
+        product_names = []
+        seen_ids = set()
+        for product in products:
+            pid = product.get("product_id", "")
+            if not pid or pid in seen_ids:
+                continue
+            seen_ids.add(pid)
+            product_ids.append(pid)
+            product_names.append(product.get("product_name") or product.get("city") or pid)
+            if len(product_ids) >= 3:
+                break
+
+        return {
+            "city": primary_city,
+            "intent": "city_overview" if _is_city_overview_query(state.query) else "city_overview",
+            "rewritten_query": state.query,
+            "requested_doc_types": requested_doc_types,
+            "product_ids": product_ids,
+            "product_names": product_names,
+            "recommended_queries": recommended_queries,
+            "need_images": need_images,
+            "query_dense": query_dense,
+            "query_sparse": query_sparse,
+            "entities": {"city": primary_city, "doc_types": requested_doc_types},
+        }
+    except Exception as recover_exc:
+        logger.error(f"Entity recovery failed: {recover_exc}")
+        return None
 
 
 def _is_city_overview_query(query: str) -> bool:

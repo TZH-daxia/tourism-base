@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Ranger Checkout</title>
+    <link rel="icon" href="/favicon.png" type="image/png" />
+    <style>
+      * { box-sizing: border-box; }
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+      }
+      body {
+        margin: 0;
+        font-family: "Noto Sans SC", "Microsoft YaHei", system-ui, sans-serif;
+        color: #151515;
+        background:
+          radial-gradient(circle at 12% 12%, rgba(55, 138, 153, 0.14), transparent 26%),
+          radial-gradient(circle at 86% 14%, rgba(222, 151, 62, 0.12), transparent 24%),
+          linear-gradient(180deg, #fbfaf7 0%, #eef4f5 100%);
+      }
+      .shell {
+        width: min(980px, calc(100% - 32px));
+        height: 100vh;
+        margin: 0 auto;
+        padding: 18px 0;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+      .topbar {
+        flex: 0 0 auto;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+      }
+      .brand-logo {
+        width: 116px;
+        height: auto;
+        display: block;
+        filter: drop-shadow(0 10px 18px rgba(20, 46, 94, 0.18));
+      }
+      a {
+        color: rgba(21, 21, 21, 0.68);
+        text-decoration: none;
+        font-weight: 700;
+      }
+      .hero,
+      .panel,
+      .modal {
+        border: 1px solid rgba(124, 139, 155, 0.18);
+        background: rgba(255, 255, 255, 0.8);
+        box-shadow: 0 26px 72px rgba(116, 131, 150, 0.14);
+        backdrop-filter: blur(18px);
+      }
+      .hero {
+        flex: 0 0 auto;
+        border-radius: 30px;
+        padding: clamp(22px, 4vw, 38px);
+      }
+      .eyebrow {
+        color: rgba(21, 21, 21, 0.48);
+        font-size: 12px;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+      }
+      h1 {
+        margin: 10px 0 0;
+        font-size: clamp(34px, 6vw, 66px);
+        line-height: 1.04;
+        letter-spacing: -0.04em;
+      }
+      .hero p,
+      .method-meta,
+      .price-sub {
+        color: rgba(21, 21, 21, 0.62);
+        line-height: 1.68;
+      }
+      .hero p {
+        max-width: 760px;
+        margin: 14px 0 0;
+      }
+      .layout {
+        flex: 1 1 auto;
+        min-height: 0;
+        display: grid;
+        grid-template-columns: 0.82fr 1.18fr;
+        gap: 16px;
+      }
+      .panel {
+        min-height: 0;
+        border-radius: 28px;
+        padding: clamp(18px, 3vw, 26px);
+      }
+      .plan-panel {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+      }
+      .plan-tag {
+        align-self: flex-start;
+        display: inline-flex;
+        padding: 8px 12px;
+        border-radius: 999px;
+        background: rgba(15, 125, 136, 0.1);
+        color: #0f7d88;
+        font-weight: 800;
+      }
+      .price {
+        margin-top: 18px;
+        font-size: clamp(42px, 7vw, 58px);
+        font-weight: 800;
+        letter-spacing: -0.05em;
+      }
+      .method-grid {
+        display: grid;
+        gap: 10px;
+        margin-top: 14px;
+      }
+      .payment-card {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: 12px;
+        align-items: start;
+        padding: 13px 14px;
+        border: 1px solid rgba(124, 139, 155, 0.18);
+        border-radius: 18px;
+        background: rgba(255, 255, 255, 0.68);
+        cursor: pointer;
+      }
+      .payment-card input { margin-top: 4px; }
+      .method-name {
+        display: block;
+        font-weight: 800;
+        margin-bottom: 3px;
+      }
+      .pay-btn,
+      .close-btn {
+        width: 100%;
+        height: 48px;
+        margin-top: 14px;
+        border: 0;
+        border-radius: 999px;
+        background: #111;
+        color: #fff;
+        font-weight: 800;
+        cursor: pointer;
+      }
+      .pay-btn:hover,
+      .close-btn:hover {
+        background: #0f7d88;
+      }
+      .overlay {
+        position: fixed;
+        inset: 0;
+        display: none;
+        place-items: center;
+        padding: 24px;
+        background: rgba(12, 18, 22, 0.48);
+      }
+      .overlay.show { display: grid; }
+      .modal {
+        width: min(460px, 100%);
+        border-radius: 28px;
+        padding: 30px;
+        text-align: center;
+      }
+      .modal h2 {
+        margin: 0;
+        font-size: 30px;
+      }
+      @media (max-width: 820px) {
+        .shell {
+          width: min(560px, calc(100% - 24px));
+          padding: 12px 0;
+          gap: 10px;
+        }
+        .brand-logo { width: 94px; }
+        .hero { padding: 18px; }
+        .layout {
+          grid-template-columns: 1fr;
+          gap: 10px;
+        }
+        .panel { padding: 16px; }
+        .plan-panel {
+          display: grid;
+          grid-template-columns: auto 1fr;
+          align-items: center;
+          gap: 8px 14px;
+        }
+        .price { margin: 0; font-size: 34px; }
+        .price-sub, #planDescription { margin: 0; }
+        .payment-card { padding: 10px 12px; }
+      }
+      @media (max-height: 680px) {
+        .hero p, .method-meta { font-size: 13px; }
+        h1 { font-size: 34px; }
+        .payment-card { padding: 9px 12px; }
+        .pay-btn { height: 42px; }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <img class="brand-logo" src="/tourism-logo.png" alt="Ranger logo" />
+        <a href="/pricing.html" target="_self">&#36820;&#22238;&#22871;&#39184;&#39029;</a>
+      </header>
+
+      <section class="hero">
+        <div class="eyebrow">Checkout</div>
+        <h1 id="heroTitle">&#30830;&#35748;&#20320;&#30340;&#22871;&#39184;</h1>
+        <p>
+          &#36825;&#37324;&#26159;&#28216;&#20384;&#26234;&#24211;&#30340;&#20805;&#20540;&#28436;&#31034;&#39029;&#12290;&#25903;&#20184;&#36890;&#36947;&#36824;&#22312;&#36335;&#19978;&#65292;&#20808;&#25226;&#38065;&#21253;&#25918;&#36731;&#26494;&#19968;&#28857;&#12290;
+        </p>
+      </section>
+
+      <section class="layout">
+        <article class="panel plan-panel">
+          <span class="plan-tag" id="planTag">Plus</span>
+          <div class="price" id="planPrice">$20</div>
+          <div class="price-sub" id="planPriceSub">&#27599;&#26376;</div>
+          <p class="method-meta" id="planDescription">&#36866;&#21512;&#32463;&#24120;&#35268;&#21010;&#36335;&#32447;&#21644;&#25972;&#29702;&#36164;&#26009;&#30340;&#29992;&#25143;&#12290;</p>
+        </article>
+
+        <article class="panel">
+          <div class="eyebrow">Payment method</div>
+          <div class="method-grid">
+            <label class="payment-card">
+              <input type="radio" name="method" checked />
+              <span><span class="method-name">&#24494;&#20449;&#25903;&#20184;</span><span class="method-meta">&#25195;&#30721;&#25903;&#20184;&#36890;&#36947;&#26242;&#26410;&#24320;&#21457;&#65292;&#27491;&#22312;&#25171;&#21253;&#28789;&#24863;&#12290;</span></span>
+            </label>
+            <label class="payment-card">
+              <input type="radio" name="method" />
+              <span><span class="method-name">&#25903;&#20184;&#23453;</span><span class="method-meta">&#36134;&#25143;&#36830;&#25509;&#22120;&#36824;&#22312;&#28909;&#36523;&#65292;&#25964;&#35831;&#26399;&#24453;&#12290;</span></span>
+            </label>
+            <label class="payment-card">
+              <input type="radio" name="method" />
+              <span><span class="method-name">&#20449;&#29992;&#21345;</span><span class="method-meta">&#22269;&#38469;&#25903;&#20184;&#23567;&#38431;&#26242;&#26102;&#21435;&#30475;&#22320;&#22270;&#20102;&#12290;</span></span>
+            </label>
+          </div>
+          <button class="pay-btn" id="payBtn">&#28857;&#25105;&#35797;&#35797;&#25903;&#20184;&#39764;&#27861;</button>
+        </article>
+      </section>
+    </main>
+
+    <div class="overlay" id="overlay">
+      <div class="modal">
+        <h2>&#25903;&#20184;&#21151;&#33021;&#27491;&#22312;&#20462;&#28860;</h2>
+        <p class="method-meta">
+          &#25903;&#20184;&#36890;&#36947;&#26242;&#26410;&#24320;&#21457;&#65292;&#25964;&#35831;&#26399;&#24453;&#12290;&#29616;&#22312;&#36825;&#20010;&#25353;&#38062;&#20808;&#20570;&#19968;&#20010;&#20248;&#38597;&#30340;&#31034;&#33539;&#65306;&#21486;&#20320;&#19968;&#22768;&#65292;&#20294;&#19981;&#25910;&#20320;&#30340;&#38065;&#12290;
+        </p>
+        <button class="close-btn" id="closeBtn">&#22238;&#21040;&#39318;&#39029;&#32487;&#32493;&#36891;</button>
+      </div>
+    </div>
+
+    <script>
+      const plans = {
+        free: {
+          label: 'Free',
+          price: '$0',
+          sub: '\u57fa\u7840\u4f53\u9a8c',
+          desc: '\u9002\u5408\u67e5\u770b\u4ea7\u54c1\u4f53\u9a8c\u548c\u6d4b\u8bd5\u57fa\u672c\u95ee\u7b54\u3002',
+        },
+        plus: {
+          label: 'Plus',
+          price: '$20',
+          sub: '\u6bcf\u6708',
+          desc: '\u9002\u5408\u7ecf\u5e38\u89c4\u5212\u8def\u7ebf\u3001\u6574\u7406\u8d44\u6599\u548c\u6301\u7eed\u4f7f\u7528\u65c5\u884c\u95ee\u7b54\u7684\u7528\u6237\u3002',
+        },
+        pro: {
+          label: 'Pro',
+          price: '$50',
+          sub: '\u6bcf\u6708',
+          desc: '\u9002\u5408\u56e2\u961f\u3001\u9879\u76ee\u548c\u9ad8\u9891\u8d44\u6599\u7ef4\u62a4\u573a\u666f\u3002',
+        },
+      }
+
+      const params = new URLSearchParams(window.location.search)
+      const planKey = plans[params.get('plan')] ? params.get('plan') : 'plus'
+      const current = plans[planKey]
+
+      document.getElementById('planTag').textContent = current.label
+      document.getElementById('planPrice').textContent = current.price
+      document.getElementById('planPriceSub').textContent = current.sub
+      document.getElementById('planDescription').textContent = current.desc
+      document.getElementById('heroTitle').textContent = `\u786e\u8ba4 ${current.label} \u5957\u9910`
+
+      document.getElementById('payBtn').addEventListener('click', () => {
+        document.getElementById('overlay').classList.add('show')
+      })
+      document.getElementById('closeBtn').addEventListener('click', () => {
+        window.location.href = '/'
+      })
+    </script>
+  </body>
+</html>

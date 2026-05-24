@@ -25,6 +25,8 @@ def search_hyde(state: RAGChatState) -> Dict[str, Any]:
     try:
         if not state.product_ids:
             return {"hyde_chunks": []}
+        if _should_skip_hyde(state):
+            return {"hyde_chunks": []}
         llm = get_llm()
         if not llm:
             return {"hyde_chunks": []}
@@ -45,6 +47,15 @@ def search_hyde(state: RAGChatState) -> Dict[str, Any]:
     except Exception as exc:
         logger.warning(f"HyDE search skipped: {exc}")
         return {"errors": state.errors + [f"[search_hyde] {exc}"], "hyde_chunks": []}
+
+
+def _should_skip_hyde(state: RAGChatState) -> bool:
+    query = (state.rewritten_query or state.query or "").strip()
+    if len(query) <= 18 and state.intent in {"city_overview", "traffic", "hotel", "food", "route"}:
+        return True
+    if state.intent == "city_overview" and len(state.requested_doc_types) >= 3:
+        return True
+    return False
 
 
 def _build_filter(product_ids: List[str], doc_types: List[str]) -> str:

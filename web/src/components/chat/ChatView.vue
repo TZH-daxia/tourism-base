@@ -4,7 +4,13 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { knowledgeApi, type RuntimeModelSettings } from '../../api/knowledge'
 import { useChatStore, type Message, type Session } from '../../stores/chat'
 
-const props = defineProps<{ kbVersion: number }>()
+const props = defineProps<{
+  kbVersion: number
+  authRole: 'root' | 'guest'
+  displayName: string
+  displayEmail: string
+  resetGuestState: boolean
+}>()
 const emit = defineEmits<{ 'open-kb': []; logout: [] }>()
 
 type ModelTestStatus = 'idle' | 'success' | 'failed'
@@ -84,6 +90,7 @@ const hasMessages = computed(() => store.currentMessages.length > 0)
 const selectedModelProfile = computed(() => modelProfiles.value.find(item => item.id === selectedModelId.value) || null)
 const activeCustomModelProfile = computed(() => modelProfiles.value.find(item => item.id === activeModelId.value) || null)
 const isDefaultModelSelected = computed(() => selectedModelId.value === DEFAULT_MODEL_ID)
+const canManageWorkspace = computed(() => props.authRole === 'root')
 const ragEnabledCopy = '当前状态： 已开启 ，优先命中旅游知识库'
 const ragDisabledCopy = '当前状态： 已关闭 ，仅进行普通AI问答'
 const toggleReserveCopy = ragEnabledCopy.length >= ragDisabledCopy.length ? ragEnabledCopy : ragDisabledCopy
@@ -113,12 +120,16 @@ function isAssistantPending(message: Message) {
   return message.role === 'assistant' && Boolean(message.pending)
 }
 
+function hasVisibleContent(message: Message) {
+  return Boolean(message.content && message.content.trim())
+}
+
 function showWaitingSkeleton(message: Message) {
-  return isAssistantPending(message) && !message.content
+  return isAssistantPending(message) && !hasVisibleContent(message)
 }
 
 function displayThinkingTime(message: Message) {
-  if (isAssistantPending(message)) {
+  if (isAssistantPending(message) && !message.content) {
     const startedAt = +new Date(message.timestamp)
     return Math.max(0, Math.round((liveNow.value - startedAt) / 100) / 10)
   }
@@ -156,47 +167,120 @@ function splitMarkdownTableRow(line: string) {
     .map(cell => renderInlineMarkdown(cell.trim()))
 }
 
-function renderMessageHtml(content: string) {
+function normalizeMarkdownTableLines(content: string) {
   const normalized = escapeHtml(content || '')
-    .replace(/\r\n/g, '\n')
-    .replace(/\n{3,}/g, '\n\n')
+    .replace(/\r\n?/g, '\n')
+    .replace(/\uFF5C/g, '|')
+    .replace(/[\u200B-\u200D\uFEFF]/g, '')
     .trim()
 
-  if (!normalized) return ''
+  if (!normalized) return []
 
-  const blocks = normalized.split(/\n{2,}/)
-  const htmlBlocks = blocks.map(block => {
-    const lines = block.split('\n').map(line => line.trimEnd()).filter(Boolean)
-    if (!lines.length) return ''
+  const rawLines = normalized.split('\n').map(line => line.trimEnd())
+  const lines: string[] = []
 
-    if (lines.length >= 2 && lines[0].includes('|') && isMarkdownTableSeparator(lines[1])) {
-      const headers = splitMarkdownTableRow(lines[0]).map(cell => `<th>${cell}</th>`).join('')
-      const rows = lines
-        .slice(2)
-        .filter(line => line.includes('|'))
+  for (let index = 0; index < rawLines.length; index += 1) {
+    const current = rawLines[index]
+    const trimmed = current.trim()
+
+    if (!trimmed) {
+      const previous = lines[lines.length - 1]?.trim() || ''
+      let nextIndex = index + 1
+      while (nextIndex < rawLines.length && !rawLines[nextIndex].trim()) nextIndex += 1
+      const next = rawLines[nextIndex]?.trim() || ''
+      if (previous.includes('|') && next.includes('|')) continue
+      lines.push('')
+      continue
+    }
+
+    lines.push(current)
+  }
+
+  return lines
+}
+
+function renderMessageHtml(content: string) {
+  const lines = normalizeMarkdownTableLines(content)
+  if (!lines.length) return ''
+
+  const htmlBlocks: string[] = []
+  for (let index = 0; index < lines.length; ) {
+    const current = lines[index]?.trim() || ''
+    if (!current) {
+      index += 1
+      continue
+    }
+
+    if (current.includes('|')) {
+      let lookahead = index + 1
+      while (lookahead < lines.length && !lines[lookahead].trim()) lookahead += 1
+      if (lookahead < lines.length && isMarkdownTableSeparator(lines[lookahead].trim())) {
+        const tableLines = [current, lines[lookahead].trim()]
+        index = lookahead + 1
+        while (index < lines.length) {
+          const row = lines[index].trim()
+          if (!row) {
+            index += 1
+            continue
+          }
+          if (!row.includes('|')) break
+          tableLines.push(row)
+          index += 1
+        }
+
+        const headers = splitMarkdownTableRow(tableLines[0]).map(cell => `<th>${cell}</th>`).join('')
+        const rows = tableLines
+          .slice(2)
+          .map(line => {
+            const cells = splitMarkdownTableRow(line).map(cell => `<td>${cell}</td>`).join('')
+            return `<tr>${cells}</tr>`
+          })
+          .join('')
+        htmlBlocks.push(`<div class="md-table-wrap"><table><thead><tr>${headers}</tr></thead><tbody>${rows}</tbody></table></div>`)
+        continue
+      }
+    }
+
+    const paragraphLines: string[] = []
+    while (index < lines.length) {
+      const line = lines[index].trim()
+      if (!line) break
+      paragraphLines.push(line)
+      index += 1
+    }
+
+    if (!paragraphLines.length) {
+      index += 1
+      continue
+    }
+
+    if (paragraphLines.every(line => /^[-*]\s+/.test(line))) {
+      const items = paragraphLines.map(line => `<li>${renderInlineMarkdown(line.replace(/^[-*]\s+/, ''))}</li>`)
+      htmlBlocks.push(`<ul>${items.join('')}</ul>`)
+      continue
+    }
+
+    if (paragraphLines.every(line => /^>\s?/.test(line))) {
+      const quote = paragraphLines
+        .map(line => renderInlineMarkdown(line.replace(/^>\s?/, '')))
+        .join('<br />')
+      htmlBlocks.push(`<blockquote>${quote}</blockquote>`)
+      continue
+    }
+
+    htmlBlocks.push(
+      paragraphLines
         .map(line => {
-          const cells = splitMarkdownTableRow(line).map(cell => `<td>${cell}</td>`).join('')
-          return `<tr>${cells}</tr>`
+          if (/^\s*(?:---+|\*\*\*+|___+)\s*$/.test(line)) return '<hr />'
+          if (/^###\s+/.test(line)) return `<h4>${renderInlineMarkdown(line.replace(/^###\s+/, ''))}</h4>`
+          if (/^##\s+/.test(line)) return `<h3>${renderInlineMarkdown(line.replace(/^##\s+/, ''))}</h3>`
+          if (/^#\s+/.test(line)) return `<h2>${renderInlineMarkdown(line.replace(/^#\s+/, ''))}</h2>`
+          if (/^[-*]\s+/.test(line)) return `<p>${renderInlineMarkdown(line.replace(/^[-*]\s+/, '• '))}</p>`
+          return `<p>${renderInlineMarkdown(line)}</p>`
         })
-        .join('')
-      return `<div class="md-table-wrap"><table><thead><tr>${headers}</tr></thead><tbody>${rows}</tbody></table></div>`
-    }
-
-    if (lines.every(line => /^[-*]\s+/.test(line))) {
-      const items = lines.map(line => `<li>${renderInlineMarkdown(line.replace(/^[-*]\s+/, ''))}</li>`)
-      return `<ul>${items.join('')}</ul>`
-    }
-
-    return lines
-      .map(line => {
-        if (/^\s*(?:---+|\*\*\*+|___+)\s*$/.test(line)) return '<hr />'
-        if (/^##\s+/.test(line)) return `<h3>${renderInlineMarkdown(line.replace(/^##\s+/, ''))}</h3>`
-        if (/^#\s+/.test(line)) return `<h2>${renderInlineMarkdown(line.replace(/^#\s+/, ''))}</h2>`
-        if (/^[-*]\s+/.test(line)) return `<p>${renderInlineMarkdown(line.replace(/^[-*]\s+/, '• '))}</p>`
-        return `<p>${renderInlineMarkdown(line)}</p>`
-      })
-      .join('')
-  })
+        .join(''),
+    )
+  }
 
   return htmlBlocks.join('')
 }
@@ -650,12 +734,13 @@ function cancelDeleteModelProfile() {
 function toggleSettingsMenu(event?: MouseEvent) {
   event?.stopPropagation()
   showSettingsMenu.value = !showSettingsMenu.value
-  if (showSettingsMenu.value) {
+  if (showSettingsMenu.value && canManageWorkspace.value) {
     void loadRuntimeModelSettings()
   }
 }
 
 function openModelSettings(event?: MouseEvent) {
+  if (!canManageWorkspace.value) return
   event?.stopPropagation()
   showSettingsMenu.value = false
   showModelSettings.value = true
@@ -676,10 +761,12 @@ function handleDemoLogout(event?: MouseEvent) {
   event?.stopPropagation()
   showSettingsMenu.value = false
   showModelSettings.value = false
+  store.handleLogoutCleanup()
   emit('logout')
 }
 
 function openKnowledgeBackstage(event?: MouseEvent) {
+  if (!canManageWorkspace.value) return
   event?.stopPropagation()
   showSettingsMenu.value = false
   emit('open-kb')
@@ -771,6 +858,7 @@ watch(() => props.kbVersion, () => {
 })
 
 onMounted(async () => {
+  store.initialize(props.authRole === 'guest' ? 'guest' : 'member', props.authRole === 'guest' && props.resetGuestState)
   await store.refreshSessions()
   if (!store.currentSession) store.createSession()
   await store.fetchRecommendations()
@@ -841,24 +929,24 @@ onBeforeUnmount(() => {
 
       <div class="settings-dock" @click.stop>
         <button class="settings-entry" type="button" @click="toggleSettingsMenu($event)">
-          <div class="settings-avatar">游</div>
+          <div class="settings-avatar">{{ props.authRole === 'root' ? '管' : '游' }}</div>
           <div class="settings-copy">
-            <strong>游侠旅者</strong>
-            <span>demo@tourism.local</span>
+            <strong>{{ props.displayName }}</strong>
+            <span>{{ props.displayEmail }}</span>
           </div>
           <span class="settings-caret">{{ showSettingsMenu ? '▴' : '▾' }}</span>
         </button>
 
         <Transition name="fade">
           <div v-if="showSettingsMenu" class="settings-menu">
-            <button class="settings-menu-item" type="button" @click="openKnowledgeBackstage($event)">
+            <button v-if="canManageWorkspace" class="settings-menu-item" type="button" @click="openKnowledgeBackstage($event)">
               <div>
                 <strong>知识库后台管理</strong>
                 <span>上传、查看和维护旅游资料</span>
               </div>
             </button>
 
-            <button class="settings-menu-item" type="button" @click="openModelSettings($event)">
+            <button v-if="canManageWorkspace" class="settings-menu-item" type="button" @click="openModelSettings($event)">
               <div>
                 <strong>模型切换</strong>
                 <span>OpenAI 兼容接口</span>
@@ -939,12 +1027,14 @@ onBeforeUnmount(() => {
           <div v-for="(msg, index) in store.currentMessages" :key="`${msg.timestamp}_${index}`" class="message" :class="[msg.role, { pending: isAssistantPending(msg) }]">
             <div class="bubble">
               <div v-if="msg.role === 'assistant'" class="message-topline">
-                <span v-if="isAssistantPending(msg)" class="thinking-pill">{{ waitingLabel(msg) }}</span>
-                <span v-else-if="displayThinkingTime(msg)" class="thinking-pill subtle">思考 {{ displayThinkingTime(msg).toFixed(1) }}s</span>
+                <span v-if="!showWaitingSkeleton(msg) && displayThinkingTime(msg)" class="thinking-pill">思考 {{ displayThinkingTime(msg).toFixed(1) }}s</span>
                 <span v-if="msg.ragReferenced && !isAssistantPending(msg)" class="knowledge-badge">知识库已命中</span>
               </div>
 
               <div v-if="showWaitingSkeleton(msg)" class="waiting-state">
+                <div class="waiting-header">
+                  <span class="thinking-pill">{{ waitingLabel(msg) }}</span>
+                </div>
                 <div class="waiting-line strong"></div>
                 <div class="waiting-line"></div>
                 <div class="waiting-line short"></div>
@@ -1382,6 +1472,17 @@ onBeforeUnmount(() => {
 
 .settings-menu-item.danger {
   color: var(--red);
+}
+
+.settings-menu-note {
+  margin-bottom: 10px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: rgba(14, 124, 134, 0.08);
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.7;
+  box-shadow: inset 0 0 0 1px rgba(14, 124, 134, 0.12);
 }
 
 .model-panel {
@@ -2290,18 +2391,19 @@ onBeforeUnmount(() => {
 
 .thinking-pill,
 .knowledge-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
   border-radius: 999px;
   padding: 4px 10px;
+  font-size: 12px;
+  line-height: 1;
+  white-space: nowrap;
 }
 
 .thinking-pill {
   background: rgba(221, 139, 47, 0.12);
   color: #9b5b19;
-}
-
-.thinking-pill.subtle {
-  background: rgba(46, 37, 24, 0.06);
-  color: var(--text-secondary);
 }
 
 .knowledge-badge {
@@ -2313,6 +2415,12 @@ onBeforeUnmount(() => {
   display: grid;
   gap: 12px;
   margin-top: 16px;
+}
+
+.waiting-header {
+  display: flex;
+  align-items: center;
+  min-height: 24px;
 }
 
 .waiting-line {
@@ -2340,15 +2448,18 @@ onBeforeUnmount(() => {
 
 .message-text :deep(h2),
 .message-text :deep(h3),
+.message-text :deep(h4),
 .message-text :deep(p),
 .message-text :deep(ul),
+.message-text :deep(blockquote),
 .message-text :deep(hr),
 .message-text :deep(.md-table-wrap) {
   margin: 0;
 }
 
 .message-text :deep(h2),
-.message-text :deep(h3) {
+.message-text :deep(h3),
+.message-text :deep(h4) {
   margin-top: 10px;
   color: inherit;
   font-size: 16px;
@@ -2357,8 +2468,10 @@ onBeforeUnmount(() => {
 
 .message-text :deep(h2):first-child,
 .message-text :deep(h3):first-child,
+.message-text :deep(h4):first-child,
 .message-text :deep(p):first-child,
 .message-text :deep(ul):first-child,
+.message-text :deep(blockquote):first-child,
 .message-text :deep(.md-table-wrap):first-child {
   margin-top: 0;
 }
@@ -2366,15 +2479,28 @@ onBeforeUnmount(() => {
 .message-text :deep(p + p),
 .message-text :deep(p + ul),
 .message-text :deep(p + .md-table-wrap),
+.message-text :deep(p + blockquote),
 .message-text :deep(ul + p),
+.message-text :deep(ul + blockquote),
 .message-text :deep(.md-table-wrap + p),
 .message-text :deep(.md-table-wrap + ul),
+.message-text :deep(.md-table-wrap + blockquote),
 .message-text :deep(h2 + p),
 .message-text :deep(h3 + p),
+.message-text :deep(h4 + p),
+.message-text :deep(h2 + blockquote),
+.message-text :deep(h3 + blockquote),
+.message-text :deep(h4 + blockquote),
 .message-text :deep(h2 + ul),
 .message-text :deep(h3 + ul),
+.message-text :deep(h4 + ul),
 .message-text :deep(h2 + .md-table-wrap),
 .message-text :deep(h3 + .md-table-wrap),
+.message-text :deep(h4 + .md-table-wrap),
+.message-text :deep(blockquote + p),
+.message-text :deep(blockquote + ul),
+.message-text :deep(blockquote + .md-table-wrap),
+.message-text :deep(blockquote + blockquote),
 .message-text :deep(ul + ul),
 .message-text :deep(ul + .md-table-wrap),
 .message-text :deep(hr + p),
@@ -2385,6 +2511,14 @@ onBeforeUnmount(() => {
 
 .message-text :deep(ul) {
   padding-left: 18px;
+}
+
+.message-text :deep(blockquote) {
+  padding: 12px 14px;
+  border-left: 3px solid rgba(74, 113, 255, 0.34);
+  background: rgba(243, 246, 255, 0.92);
+  border-radius: 0 14px 14px 0;
+  color: rgba(39, 47, 79, 0.92);
 }
 
 .message-text :deep(li + li) {

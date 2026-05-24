@@ -16,7 +16,7 @@ class Settings(BaseSettings):
 
     # ========== MongoDB ==========
     mongo_url: str = "mongodb://192.168.10.129:27017"
-    mongo_db_name: str = "ly001"
+    mongo_db_name: str = "tb001"
 
     # ========== Milvus ==========
     milvus_url: str = "http://192.168.10.129:19530"

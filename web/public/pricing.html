@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Ranger Pricing</title>
+    <link rel="icon" href="/favicon.png" type="image/png" />
+    <style>
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: "Noto Sans SC", "Microsoft YaHei", system-ui, sans-serif;
+        color: #151515;
+        background:
+          radial-gradient(circle at 12% 12%, rgba(55, 138, 153, 0.14), transparent 26%),
+          radial-gradient(circle at 86% 14%, rgba(222, 151, 62, 0.12), transparent 24%),
+          linear-gradient(180deg, #fbfaf7 0%, #eef4f5 100%);
+      }
+      .shell {
+        width: min(1180px, calc(100% - 32px));
+        margin: 0 auto;
+        padding: 22px 0 72px;
+      }
+      .topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 22px;
+      }
+      .brand-logo {
+        width: 132px;
+        height: auto;
+        display: block;
+        filter: drop-shadow(0 10px 18px rgba(20, 46, 94, 0.18));
+      }
+      a { color: rgba(21, 21, 21, 0.68); text-decoration: none; font-weight: 600; }
+      .hero, .card {
+        border: 1px solid rgba(124, 139, 155, 0.18);
+        background: rgba(255, 255, 255, 0.78);
+        box-shadow: 0 30px 80px rgba(116, 131, 150, 0.14);
+        backdrop-filter: blur(18px);
+      }
+      .hero {
+        border-radius: 34px;
+        padding: clamp(32px, 6vw, 58px);
+      }
+      .eyebrow {
+        color: rgba(21, 21, 21, 0.48);
+        font-size: 12px;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+      }
+      h1 {
+        margin: 16px 0 0;
+        max-width: 920px;
+        font-size: clamp(44px, 7vw, 94px);
+        line-height: 1.02;
+        letter-spacing: -0.04em;
+      }
+      .hero p {
+        max-width: 760px;
+        margin: 22px 0 0;
+        color: rgba(21, 21, 21, 0.64);
+        font-size: 18px;
+        line-height: 1.86;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 22px;
+        margin-top: 24px;
+      }
+      .card {
+        display: flex;
+        flex-direction: column;
+        min-height: 100%;
+        border-radius: 30px;
+        padding: 28px;
+      }
+      .card.selectable { cursor: pointer; }
+      .card.selectable:hover {
+        transform: translateY(-3px);
+        border-color: rgba(15, 125, 136, 0.36);
+      }
+      .card-head {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        color: rgba(21, 21, 21, 0.52);
+        font-size: 13px;
+      }
+      .tier {
+        font-weight: 800;
+        color: #0f7d88;
+      }
+      .price {
+        margin-top: 24px;
+        font-size: 54px;
+        font-weight: 800;
+        letter-spacing: -0.05em;
+      }
+      .sub {
+        color: rgba(21, 21, 21, 0.5);
+        font-size: 13px;
+      }
+      h2 {
+        margin: 24px 0 0;
+        font-size: 25px;
+        line-height: 1.25;
+      }
+      p, li {
+        color: rgba(21, 21, 21, 0.62);
+        line-height: 1.78;
+      }
+      ul {
+        padding-left: 18px;
+        margin: 18px 0 0;
+      }
+      .btn {
+        margin-top: auto;
+        display: inline-flex;
+        justify-content: center;
+        align-items: center;
+        height: 48px;
+        border-radius: 999px;
+        background: #111;
+        color: #fff;
+        font-weight: 800;
+      }
+      .btn.ghost {
+        background: rgba(21, 21, 21, 0.08);
+        color: #151515;
+      }
+      @media (max-width: 920px) {
+        .grid { grid-template-columns: 1fr; }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <img class="brand-logo" src="/tourism-logo.png" alt="Ranger logo" />
+        <a href="/" target="_self">返回首页</a>
+      </header>
+
+      <section class="hero">
+        <div class="eyebrow">Membership</div>
+        <h1>选择适合你的游侠智库额度。</h1>
+        <p>从轻量体验到深度使用，不同套餐对应不同的问答额度和资料处理能力。当前页面为演示支付流程，不会发起真实扣款。</p>
+      </section>
+
+      <section class="grid">
+        <article class="card">
+          <div class="card-head"><span>适合尝鲜</span><span class="tier">Free</span></div>
+          <div class="price">$0</div>
+          <div class="sub">基础体验</div>
+          <h2>先试试旅游问答是否适合你。</h2>
+          <p>适合查看产品体验、测试基本问答和确认资料组织方式。</p>
+          <ul>
+            <li>基础旅行问答体验</li>
+            <li>有限使用额度</li>
+            <li>适合个人试用</li>
+          </ul>
+          <a class="btn ghost" href="/" target="_self">回到首页体验</a>
+        </article>
+
+        <article class="card selectable" onclick="openCheckout('plus')">
+          <div class="card-head"><span>最实用</span><span class="tier">Plus</span></div>
+          <div class="price">$20</div>
+          <div class="sub">每月</div>
+          <h2>适合经常规划路线和整理资料。</h2>
+          <p>更高额度，更适合日常旅行计划、城市攻略检索和多人出行准备。</p>
+          <ul>
+            <li>包含 Free 的全部能力</li>
+            <li>更高问答额度</li>
+            <li>适合持续使用</li>
+          </ul>
+          <a class="btn" href="/checkout.html?plan=plus" target="_self">选择 Plus</a>
+        </article>
+
+        <article class="card selectable" onclick="openCheckout('pro')">
+          <div class="card-head"><span>适合重度用户</span><span class="tier">Pro</span></div>
+          <div class="price">$50</div>
+          <div class="sub">每月</div>
+          <h2>适合团队、项目和高频资料维护。</h2>
+          <p>面向需要更高频问答、更稳定资料维护和更完整旅行知识流程的用户。</p>
+          <ul>
+            <li>包含 Plus 的全部能力</li>
+            <li>更高处理额度</li>
+            <li>适合团队协作和深度维护</li>
+          </ul>
+          <a class="btn" href="/checkout.html?plan=pro" target="_self">选择 Pro</a>
+        </article>
+      </section>
+    </main>
+
+    <script>
+      function openCheckout(plan) {
+        window.location.href = `/checkout.html?plan=${plan}`
+      }
+    </script>
+  </body>
+</html>

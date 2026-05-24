@@ -9,19 +9,45 @@
       <stop stop-color="#102A43"/>
       <stop offset="1" stop-color="#0F7D88"/>
     </linearGradient>
+    <filter id="soft-shadow" x="10" y="4" width="44" height="54" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feFlood flood-opacity="0" result="BackgroundImageFix"/>
+      <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+      <feOffset dy="1.5"/>
+      <feGaussianBlur stdDeviation="1.8"/>
+      <feComposite in2="hardAlpha" operator="out"/>
+      <feColorMatrix type="matrix" values="0 0 0 0 0.0588235 0 0 0 0 0.129412 0 0 0 0 0.239216 0 0 0 0.18 0"/>
+      <feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_1_1"/>
+      <feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_1_1" result="shape"/>
+    </filter>
   </defs>
 
-  <path
-    d="M32 6C21.8 6 13.5 14.3 13.5 24.5C13.5 38.6 27.6 51.1 30.5 53.4C31.4 54.2 32.6 54.2 33.5 53.4C36.4 51.1 50.5 38.6 50.5 24.5C50.5 14.3 42.2 6 32 6Z"
-    fill="url(#pin)"
-  />
-  <circle cx="32" cy="24.5" r="10" fill="white"/>
-  <path d="M32 16.5L36.2 24.8L32 33L27.8 24.8L32 16.5Z" fill="url(#needle)"/>
-  <path
-    d="M22.2 44.6C25.6 41.8 29.3 40.4 33.1 40.4C37.1 40.4 40.9 41.7 44.5 44"
-    stroke="white"
-    stroke-width="3.6"
-    stroke-linecap="round"
-  />
-  <circle cx="44.8" cy="44.1" r="3.6" fill="white"/>
+  <g filter="url(#soft-shadow)">
+    <path
+      d="M32 6C21.8 6 13.5 14.3 13.5 24.5C13.5 38.6 27.6 51.1 30.5 53.4C31.4 54.2 32.6 54.2 33.5 53.4C36.4 51.1 50.5 38.6 50.5 24.5C50.5 14.3 42.2 6 32 6Z"
+      fill="url(#pin)"
+    />
+    <path
+      d="M32 7.1C22.42 7.1 14.6 14.95 14.6 24.5C14.6 37.45 27.68 49.18 31.18 51.96C31.66 52.37 32.34 52.37 32.82 51.96C36.32 49.18 49.4 37.45 49.4 24.5C49.4 14.95 41.58 7.1 32 7.1Z"
+      stroke="white"
+      stroke-opacity="0.22"
+      stroke-width="1"
+    />
+    <path
+      d="M22.4 12.4C19.36 15.07 17.42 18.96 17.08 23.3"
+      stroke="white"
+      stroke-opacity="0.22"
+      stroke-width="2.2"
+      stroke-linecap="round"
+    />
+    <circle cx="32" cy="24.5" r="10" fill="white"/>
+    <circle cx="32" cy="24.5" r="9.2" stroke="#E7F4F8" stroke-width="0.9"/>
+    <path d="M32 16.5L36.2 24.8L32 33L27.8 24.8L32 16.5Z" fill="url(#needle)"/>
+    <path
+      d="M22.2 44.6C25.6 41.8 29.3 40.4 33.1 40.4C37.1 40.4 40.9 41.7 44.5 44"
+      stroke="white"
+      stroke-width="3.6"
+      stroke-linecap="round"
+    />
+    <circle cx="44.8" cy="44.1" r="3.6" fill="white"/>
+  </g>
 </svg>

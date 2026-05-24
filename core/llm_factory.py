@@ -33,6 +33,8 @@ def get_llm(model: str | None = None, json_mode: bool = False):
         temperature=settings.llm_default_temperature,
         api_key=runtime["api_key"],
         base_url=runtime["base_url"],
+        timeout=30,
+        max_retries=1,
         extra_body={"enable_thinking": False},
         model_kwargs=model_kwargs,
     )

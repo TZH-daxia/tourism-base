@@ -266,21 +266,40 @@ tourism/{city}/{doc_type}/{task_id}/{file_name}
 
 ### 后端
 
+PowerShell：
+
 ```powershell
 uv sync
-uv run python -m uvicorn main:app --host 127.0.0.1 --port 8000
+.\.venv\Scripts\python.exe -m uvicorn main:app --host 127.0.0.1 --port 8000
 ```
+
+cmd：
+
+```cmd
+uv sync
+.venv\Scripts\python.exe -m uvicorn main:app --host 127.0.0.1 --port 8000
+```
+
+说明：
+- 需要在项目根目录 `tourism_base/` 下执行
+- 启动前先确认 `8000` 端口没有旧服务占用，否则前端可能会连到旧后端
 
 接口文档：
 - [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
 
 ### 前端
 
+PowerShell / cmd：
+
 ```powershell
 cd web
 npm install
 npm run dev
 ```
+
+说明：
+- 需要在 `web/` 目录下执行
+- 前端默认运行在 `5173` 端口，并通过 Vite 代理把 `/api` 转发到 `http://127.0.0.1:8000`
 
 开发地址：
 - [http://127.0.0.1:5173](http://127.0.0.1:5173)
@@ -576,7 +595,7 @@ OPENAI_API_BASE=https://api.siliconflow.cn/v1
 LLM_DEFAULT_MODEL=Pro/moonshotai/Kimi-K2.5
 
 MONGO_URL=mongodb://127.0.0.1:27017
-MONGO_DB_NAME=ly001
+MONGO_DB_NAME=tb001
 
 MILVUS_URL=http://127.0.0.1:19530
 CHUNKS_COLLECTION=ly_chunks

@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>About Ranger</title>
+    <link rel="icon" href="/favicon.png" type="image/png" />
+    <style>
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      body {
+        margin: 0;
+        font-family: "Noto Sans SC", "Microsoft YaHei", system-ui, sans-serif;
+        color: #151515;
+        background:
+          radial-gradient(circle at 12% 12%, rgba(55, 138, 153, 0.14), transparent 26%),
+          radial-gradient(circle at 86% 14%, rgba(222, 151, 62, 0.12), transparent 24%),
+          linear-gradient(180deg, #fbfaf7 0%, #eef4f5 100%);
+      }
+      .shell {
+        width: min(1160px, calc(100% - 32px));
+        margin: 0 auto;
+        padding: 22px 0 72px;
+      }
+      .topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        padding-bottom: 22px;
+      }
+      .brand-logo {
+        width: 132px;
+        height: auto;
+        display: block;
+        filter: drop-shadow(0 10px 18px rgba(20, 46, 94, 0.18));
+      }
+      a {
+        color: rgba(21, 21, 21, 0.68);
+        text-decoration: none;
+        font-weight: 600;
+      }
+      .hero, .panel, .closing {
+        border: 1px solid rgba(124, 139, 155, 0.18);
+        background: rgba(255, 255, 255, 0.78);
+        box-shadow: 0 30px 80px rgba(116, 131, 150, 0.14);
+        backdrop-filter: blur(18px);
+      }
+      .hero {
+        min-height: 68vh;
+        display: grid;
+        align-content: center;
+        border-radius: 34px;
+        padding: clamp(32px, 6vw, 68px);
+      }
+      .eyebrow {
+        color: rgba(21, 21, 21, 0.48);
+        font-size: 12px;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+      }
+      h1 {
+        margin: 16px 0 0;
+        max-width: 980px;
+        font-size: clamp(46px, 8vw, 108px);
+        line-height: 1.02;
+        letter-spacing: -0.04em;
+      }
+      .hero p {
+        max-width: 780px;
+        margin: 24px 0 0;
+        color: rgba(21, 21, 21, 0.64);
+        font-size: 18px;
+        line-height: 1.9;
+      }
+      .stats, .grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 18px;
+        margin-top: 22px;
+      }
+      .stat, .panel {
+        border-radius: 24px;
+        padding: 24px;
+      }
+      .stat {
+        background: rgba(255, 255, 255, 0.62);
+        border: 1px solid rgba(124, 139, 155, 0.16);
+      }
+      .stat strong {
+        display: block;
+        font-size: 28px;
+        margin-bottom: 6px;
+      }
+      .stat span, .panel p, li {
+        color: rgba(21, 21, 21, 0.62);
+        line-height: 1.82;
+      }
+      .panel h2 {
+        margin: 10px 0 0;
+        font-size: 28px;
+        line-height: 1.25;
+      }
+      .chip {
+        display: inline-flex;
+        color: #0f7d88;
+        font-size: 12px;
+        font-weight: 800;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+      }
+      .editorial {
+        display: grid;
+        grid-template-columns: 1.2fr 0.8fr;
+        gap: 18px;
+        margin-top: 18px;
+      }
+      .closing {
+        margin-top: 18px;
+        border-radius: 30px;
+        padding: 34px;
+      }
+      footer {
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        margin-top: 28px;
+        color: rgba(21, 21, 21, 0.48);
+        font-size: 13px;
+      }
+      @media (max-width: 860px) {
+        .stats, .grid, .editorial { grid-template-columns: 1fr; }
+        .hero { min-height: auto; }
+        footer { flex-direction: column; }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <img class="brand-logo" src="/tourism-logo.png" alt="Ranger logo" />
+        <a href="/" target="_self">返回首页</a>
+      </header>
+
+      <section class="hero">
+        <div class="eyebrow">About Ranger</div>
+        <h1>游侠智库，让旅行问题先被理顺。</h1>
+        <p>
+          Ranger Think Tank 面向旅游资料检索、路线规划和问答服务，把分散的攻略、酒店、交通、美食和景点信息整理成一个可持续维护的旅行知识系统。
+        </p>
+        <div class="stats">
+          <div class="stat"><strong>5 类</strong><span>覆盖交通、景点、酒店、美食和线路等核心旅行资料。</span></div>
+          <div class="stat"><strong>1 个入口</strong><span>用户用自然语言提问，不需要翻找文件和表格。</span></div>
+          <div class="stat"><strong>可维护</strong><span>后台支持持续更新资料，让知识库长期保持可用。</span></div>
+        </div>
+      </section>
+
+      <section class="grid">
+        <article class="panel">
+          <span class="chip">Position</span>
+          <h2>不是普通搜索框，而是旅行资料的判断入口。</h2>
+          <p>它把问题拆成目的地、时间、预算、偏好和资料来源，再给出更接近真实行程的回答。</p>
+        </article>
+        <article class="panel">
+          <span class="chip">Ambition</span>
+          <h2>让旅行建议从“看起来很多”变成“真的可执行”。</h2>
+          <p>回答应该减少用户比较和复制的成本，而不是再制造一堆新的链接。</p>
+        </article>
+        <article class="panel">
+          <span class="chip">Tone</span>
+          <h2>清晰、克制、可靠，像一位耐心的旅行助理。</h2>
+          <p>不夸张承诺，不堆砌噱头，把路线、理由和注意事项讲明白。</p>
+        </article>
+      </section>
+
+      <section class="editorial">
+        <article class="panel">
+          <span class="chip">For Travelers</span>
+          <h2>少一点切换页面，多一点直接决策。</h2>
+          <p>你可以问“第一次去云南怎么安排”“成都三天怎么吃”“带老人去杭州住哪里方便”，系统会围绕已有资料给出建议。</p>
+        </article>
+        <article class="panel">
+          <span class="chip">For Admins</span>
+          <h2>资料越多，越需要秩序。</h2>
+          <ul>
+            <li>统一上传和维护旅行资料。</li>
+            <li>保留回答来源，方便回看和修正。</li>
+            <li>让知识库从一次性演示变成日常工具。</li>
+          </ul>
+        </article>
+      </section>
+
+      <section class="closing">
+        <span class="chip">Ranger Think Tank</span>
+        <h2>把旅行信息从零散内容，整理成可以被提问、复用和维护的知识资产。</h2>
+      </section>
+
+      <footer>
+        <span>Ranger Think Tank / 游侠智库</span>
+        <span>Built for better travel questions.</span>
+      </footer>
+    </main>
+  </body>
+</html>
