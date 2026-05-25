@@ -595,7 +595,7 @@ OPENAI_API_BASE=https://api.siliconflow.cn/v1
 LLM_DEFAULT_MODEL=Pro/moonshotai/Kimi-K2.5
 
 MONGO_URL=mongodb://127.0.0.1:27017
-MONGO_DB_NAME=tb001
+MONGO_DB_NAME=ly001
 
 MILVUS_URL=http://127.0.0.1:19530
 CHUNKS_COLLECTION=ly_chunks
@@ -604,7 +604,7 @@ ENTITIES_COLLECTION=ly_tourism_entities
 MINIO_ENDPOINT=127.0.0.1:9000
 MINIO_ACCESS_KEY=minioadmin
 MINIO_SECRET_KEY=minioadmin
-MINIO_BUCKET_NAME=tourism-kb
+MINIO_BUCKET_NAME=knowledge-base
 
 BGE_M3_PATH=D:\AI_models\models\bge-m3
 BGE_DEVICE=cuda:0

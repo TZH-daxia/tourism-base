@@ -16,13 +16,12 @@ class Settings(BaseSettings):
 
     # ========== MongoDB ==========
     mongo_url: str = "mongodb://192.168.10.129:27017"
-    mongo_db_name: str = "tb001"
+    mongo_db_name: str = "ly001"
 
     # ========== Milvus ==========
     milvus_url: str = "http://192.168.10.129:19530"
-    chunks_collection: str = "kb_chunks"
-    entities_collection: str = "kb_item_names"
-    # .env 中为 ly_chunks / ly_tourism_entities，pydantic-settings 自动映射 CHUNKS_COLLECTION / ENTITIES_COLLECTION
+    chunks_collection: str = "ly_chunks"
+    entities_collection: str = "ly_tourism_entities"
     milvus_metric_type: str = "COSINE"
     milvus_min_cosine_score: float = 0.75
 
@@ -35,7 +34,7 @@ class Settings(BaseSettings):
     minio_endpoint: str = "192.168.10.129:9000"
     minio_access_key: str = "minioadmin"
     minio_secret_key: str = "minioadmin"
-    minio_bucket_name: str = "tourism-kb"
+    minio_bucket_name: str = "knowledge-base"
     minio_secure: bool = False
 
     # ========== MinerU ==========

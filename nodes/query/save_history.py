@@ -12,7 +12,7 @@ from tool.logger import logger
 def save_history(state: RAGChatState) -> Dict[str, Any]:
     logger.info(f"Save history: {state.session_id}")
     try:
-        if not state.session_id:
+        if not state.session_id or state.guest_mode:
             return {}
         mongo = MongoManager.get()
         asyncio.run(

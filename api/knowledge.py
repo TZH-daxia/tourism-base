@@ -355,7 +355,12 @@ async def rag_chat_stream(request: RAGChatRequest):
                 else:
                     history = await mongo.get_recent(session_id, limit=10)
                     history_dicts = [{"role": msg.get("role", ""), "content": msg.get("content", "")} for msg in history]
-                init = RAGChatState(query=request.message, session_id=session_id, history=history_dicts)
+                init = RAGChatState(
+                    query=request.message,
+                    session_id=session_id,
+                    guest_mode=request.guest_mode,
+                    history=history_dicts,
+                )
                 from graphs.graph_builder import query_graph
 
                 loop = asyncio.get_event_loop()
@@ -458,7 +463,7 @@ async def rag_chat(request: RAGChatRequest):
 
         if request_history:
             llm_history = _ensure_current_user(request_history, request.message)
-        elif request.guest_mode:
+        elif request.guest_mode or not request.session_id:
             llm_history = [{"role": "user", "content": request.message}]
         else:
             history = await mongo.get_recent(session_id, limit=10)
@@ -483,6 +488,7 @@ async def rag_chat(request: RAGChatRequest):
     init = RAGChatState(
         query=request.message,
         session_id=session_id,
+        guest_mode=request.guest_mode,
         history=history_payload,
     )
     from graphs.graph_builder import query_graph

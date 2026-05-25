@@ -6,7 +6,25 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from fastapi.testclient import TestClient
 
+from graphs.states import RAGChatState
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+
+class _FakeQueryGraph:
+    def __init__(self):
+        self.last_payload = None
+
+    def invoke(self, payload):
+        self.last_payload = payload
+        return {
+            **payload,
+            "answer": "rag answer",
+            "sources": [],
+            "citations": [],
+            "answer_images": [],
+            "recommended_queries": [],
+        }
 
 
 @pytest.fixture(autouse=True)
@@ -170,6 +188,32 @@ class TestChatStream:
         assert resp.status_code == 200
         mgr = mock_services["mongo_mgr"]
         assert mgr.save_message.await_count == 2
+
+    def test_guest_rag_stream_does_not_persist_history(self, client, mock_services):
+        mock_services["mongo_mgr"].has_completed_tasks.return_value = True
+        fake_graph = _FakeQueryGraph()
+
+        with patch("graphs.graph_builder.query_graph", fake_graph):
+            resp = client.post(
+                "/api/knowledge/chat/stream",
+                json={"message": "guest question", "rag_enabled": True, "guest_mode": True},
+            )
+
+        assert resp.status_code == 200
+        events = self._read_sse(resp)
+        assert any(event.get("done") for event in events)
+        assert fake_graph.last_payload["guest_mode"] is True
+        assert fake_graph.last_payload["session_id"].startswith("guest_")
+        mock_services["mongo_mgr"].save_message.assert_not_awaited()
+        mock_services["mongo_mgr"].get_recent.assert_not_awaited()
+
+    def test_guest_rag_save_history_node_skips_mongo(self, mock_services):
+        from nodes.query.save_history import save_history
+
+        result = save_history(RAGChatState(query="guest question", session_id="guest_abc123", guest_mode=True, answer="answer"))
+
+        assert result == {}
+        mock_services["mongo_mgr"].save_message.assert_not_awaited()
 
 
 class TestChatPlainApi:

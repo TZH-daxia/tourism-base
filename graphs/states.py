@@ -63,6 +63,7 @@ class IngestState(BaseModel):
 class RAGChatState(BaseModel):
     query: str = ""
     session_id: str = ""
+    guest_mode: bool = False
     history: List[Dict] = Field(default_factory=list)
     entities: Dict = Field(default_factory=dict)
     city: str = ""

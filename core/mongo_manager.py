@@ -127,7 +127,7 @@ class MongoManager:
 
     async def get_chat_sessions(self, limit: int = 100) -> List[Dict]:
         cursor = self.chat_messages.find(
-            {"messages": {"$exists": True}},
+            {"messages": {"$exists": True}, "session_id": {"$not": {"$regex": "^guest_"}}},
             {"session_id": 1, "title": 1, "messages": 1, "updated_at": 1, "created_at": 1, "_id": 0},
         ).sort("updated_at", -1)
         docs = list(cursor.limit(limit))
